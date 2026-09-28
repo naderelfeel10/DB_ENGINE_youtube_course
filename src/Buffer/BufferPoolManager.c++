@@ -2,224 +2,176 @@
 
 
 BufferPoolManager::BufferPoolManager(DiskManager* dm){
-    
-    this->disk_manager = dm;   
+
+    this->disk_manager = dm;
     this->lru = new LRU(BUFFER_SIZE);
 
-    //setup BPM : 
-    for(int i{}; i<BUFFER_SIZE; i++){
+    for(int frame_id{}; frame_id<BUFFER_SIZE;frame_id++){
 
-        this->frames[i] = new char[PAGE_SIZE];
-        this->is_dirty[i] = false;
-        this->free_framses_ids.push_back(i);
-        this->pin_count[i] = 0;
-        this->pages_ids[i] = -1;
-    }
+        //for each frame, allocate a new empty frame on the heap
+        this->frames[frame_id] = new char[PAGE_SIZE]; 
+        this->is_dirty[frame_id] = false;
+        this->free_frames_ids.push_back(frame_id);
+        this->pages_ids[frame_id] = -1;
+        this->pin_counter[frame_id] = 0;
+    }    
 
 }
 
+
+
 char* BufferPoolManager::fetchPage(int page_id){
 
-    //check page_id
     if(page_id == -1){
-        cout<<"can't fetch page with page_di = -1";
-        return nullptr;
+        throw runtime_error("page id is -1");
     }
-   
+    
     int frame_id{-1};
 
-    //check if the page is in  the pages_table
+    //check pages_table, if found , then return it 
     if(pages_table.find(page_id) != pages_table.end()){
         
         frame_id = pages_table[page_id];
-        
-        //char* frame = lru->get_frame(frame_id);
-        char* frame = frames[page_id];
-        
+        //fetch ur frame : 
+        //char* frame = frames[frame_id];
+        char* frame = lru->get_frame(frame_id);
+
+
         if(frame == nullptr){
-            throw runtime_error("frame is null");
+            throw runtime_error("this frame is nullptr");
         }
-        
         return frame;
     }
 
-    cout<<"fetching the page from HD"<<endl;
-    //if it's not found in the pages_table
-    // then we have to fetch it from the disk
+    cout<<"page is not found in pages_table, let's fetch from the HD"<<endl;
+    //if not found on the pages_table, then we have to fetch it from the HD : 
+        // if we have empty space for an extra page: 
+            // then just use it, and fetch page
+        // if no space, then evict a page, then replace it with the new page 
 
-    //we have 2 cases : 
-        // 1. if there is room for additional page
-            // then I will just read the page from the hard disk
-        // 2. else if all frames are occupied 
-            // then we have to evict a page then read the new one
-    
-    
-    // if no free frames
-    if(free_framses_ids.empty() == true){
+    //check if we have space : 
+    if(free_frames_ids.empty() == true){
+        //we have to evict a page :
+        //LRU(comming soon), CLOCK.
 
-        // for now just evict the last frame
-
-        frame_id = BUFFER_SIZE -1;
-
-        //frame_id = this->lru->evict_frame();
-
-        //save the old page, then replace it with the new one 
-        int old_page_id = pages_ids[frame_id];
+        //stupid 
+        //frame_id = BUFFER_SIZE - 1;
+        frame_id = this->lru->evict_frame();
         
-        /*
-        //if is dirty, then save it before evicting
-        if(is_dirty[frame_id]){
-
+        //fetch this frame, and check if dirty 
+        int old_page_id = pages_ids[frame_id];
+        if(is_dirty[frame_id] == true){
+            //write it to the hd 
             char* old_page_data = frames[frame_id];
             this->disk_manager->write_page(old_page_id, old_page_data);
-        
         }
-
-        pages_table.erase(old_page_id);
-        */
+        //remove it from the pages_table 
+        pages_table.erase(page_id);
 
     }
-    //else if there is still free frames to use 
-    //then just use the last free frame
+    //if we have empty frames, then just use one of them 
     else{
-        frame_id = free_framses_ids.back();
-        free_framses_ids.pop_back();
+        frame_id = free_frames_ids.back();
+        free_frames_ids.pop_back();
     }
 
-    // now we have an empty frame to read the data 
+    //we have a free frame that we can use:
+    //then read ur page from the hd into this frame 
     char* buffer = frames[frame_id];
-    disk_manager->read_page(page_id, buffer);
+    this->disk_manager->read_page(page_id, buffer);
 
-    //now update our buffer pool
+    //then update ur meta data: 
     pages_ids[frame_id] = page_id;
     is_dirty[frame_id] = false;
     pages_table[page_id] = frame_id;
 
-    //finally return the page
-    char* res_buffer = frames[frame_id];
+    this->lru->put_node(frame_id, buffer);
+    //then return ur result
+    return buffer;
 
-    //lru->put_frame(frame_id, frames[frame_id]);
-    
-    return res_buffer;
 }
 
-
 int BufferPoolManager::newPage(){
-    
+
     int frame_id{-1};
-    
-    // if no free frames
-    if(free_framses_ids.empty() == true){
 
-        // for now just evict the last frame
-        frame_id = BUFFER_SIZE -1;
+    //check for free frames : 
+    if(free_frames_ids.empty() ==true){
+        //we have to evict a page 
+        //frame_id = BUFFER_SIZE - 1;
+        frame_id = this->lru->evict_frame();
+
+        //fetch the evicted frame, then check if dirty 
         
-        //frame_id  = lru->evict_frame();
-
-        //save the old page, then replace it with the new one 
         int old_page_id = pages_ids[frame_id];
-        
-        this->deletePage(old_page_id);
-        /*
-        //if is dirty, then save it before evicting
-        if(is_dirty[frame_id]){
 
+        //write back to HD if dirty
+        if(is_dirty[frame_id] == true){
             char* old_page_data = frames[frame_id];
             this->disk_manager->write_page(old_page_id, old_page_data);
-        
         }
 
-        pages_table.erase(old_page_id);
-        */
+        this->pages_table.erase(old_page_id);
     }
-    //else if there is still free frames to use 
-    //then just use the last free frame
     else{
-        frame_id = free_framses_ids.back();
-        free_framses_ids.pop_back();
+        frame_id = free_frames_ids.back();
+        free_frames_ids.pop_back();
     }
 
-    //now create a new page on disk : 
-    
+    // now we have a free frame, ready to store a new page
+    // ask the disk_manager to allocate us a new page 
     int new_page_offset = this->disk_manager->allocate_page();
     int new_page_id = new_page_offset / PAGE_SIZE;
 
-    //then read this page : 
-    char* free_frame_buffer = frames[frame_id];
+    //read it into our free frame 
     this->disk_manager->read_page(new_page_id, frames[frame_id]);
-    
-    PageHeader* header = reinterpret_cast<PageHeader*>(frames[frame_id]);
-    cout<<header->page_id<<endl;
-    //header->page_id = 
 
-    // then initialize page_header : 
-
-    //update buffer pool tables 
+    //update the tables : 
     pages_ids[frame_id] = new_page_id;
     pages_table[new_page_id] = frame_id;
     is_dirty[frame_id] = false;
 
-    //lru->put_frame(frame_id, frames[frame_id]);
-
+    this->lru->put_node(frame_id, frames[frame_id]);
     return new_page_id;
-
 }
 
 void BufferPoolManager::deletePage(int page_id){
-    
-    //check if page id exists in pages_table : 
-    if(pages_table.find(page_id) != pages_table.end()){
+
+    //check for the page in the pages_table 
+    if(this->pages_table.find(page_id) != pages_table.end()){
 
         int frame_id = pages_table[page_id];
-        //flush to disk if dirty : 
+        //check if dirty before we remove it 
         if(is_dirty[frame_id] == true){
             this->disk_manager->write_page(page_id, frames[frame_id]);
         }
-        //then remove from BPM tables : 
+
+        //then update our meta-data: 
         pages_table.erase(page_id);
         pages_ids[frame_id] = -1;
-        is_dirty[frame_id] = false;
-        free_framses_ids.push_back(frame_id);
+        is_dirty[frame_id] =false;
+        free_frames_ids.push_back(page_id);
 
-        //lru->remove_frame(frame_id);
+        this->lru->remove_frame(frame_id);
     }
 }
 
 void BufferPoolManager::mark_as_dirty(int page_id){
     int frame_id = pages_table[page_id];
     is_dirty[frame_id] = true;
-}
-
-void BufferPoolManager::unpin_page(int page_id, bool is_dirty_flag){
-
-    //check it it exists in pages_table first : 
-    if(pages_table.find(page_id) == pages_table.end()){
-        return ;
-    }
-
-    int frame_id = pages_ids[page_id];
-    
-    //decrease pin cound
-    if(pin_count[frame_id] > 0){
-        pin_count[frame_id]--;
-    }
-    //mark as dirty
-    if(is_dirty_flag){
-        is_dirty[frame_id] = true;
-    }
-}
-// ovsrervability of llms : 
-  // 1. langfuse
-  // 2. 
-
+}   
+/*
 int 
-main(){ 
+main(){
+
     const string file_name = "DB.bin";
     DiskManager* dm = new DiskManager(file_name);
 
 
     {
+
         vector<Field>fields;
+
     {
         FieldType type = FieldType::TYPE_INT;
         int value = 9;
@@ -248,7 +200,7 @@ main(){
         //create the tuple :
         Tuple tuple(fields);
 
-        int page_id = 1;
+        int page_id = 5;
         Page page(page_id);
 
         page.insert_tuple(tuple);
@@ -271,42 +223,40 @@ main(){
             cout<<endl;
         }
 
-        cout<<"testing buffer pool manager"<<endl;
-
         BufferPoolManager* BPM = new BufferPoolManager(dm);
+        cout<<"testing buffer pool manager"<<endl;
+        cout<<"testing fetch page from BPM"<<endl;
+        {   
+            char* buffer = BPM->fetchPage(page_id);
 
-        cout<<"tesging fetch page"<<endl;
-        {
-            char* page_buffer = BPM->fetchPage(page_id);
+            PageHeader* header = reinterpret_cast<PageHeader*>(buffer);
+            cout<<"number of tuples "<<header->num_of_tuples<<endl;
 
-            PageHeader* page_header = reinterpret_cast<PageHeader*>(page_buffer);
-        
-            cout<<"number of tuples "<<page_header->num_of_tuples<<endl;
-
-            assert(page_header->num_of_tuples == 5);
+            assert(header->num_of_tuples == 5);
         }
+        cout<<"testing new page from BPM"<<endl;
 
-        cout<<"tesging new page"<<endl;
         {
             int new_page_id = BPM->newPage();
-            //cout<<"new_page_id"<<new_page_id<<endl;
-            char* page_buffer = BPM->fetchPage(new_page_id);
-            //char* page_buffer = new char[PAGE_SIZE];
-            dm->read_page(new_page_id, page_buffer);
-            PageHeader* page_header = reinterpret_cast<PageHeader*>(page_buffer);
-        
-            cout<<"new page id "<<page_header->page_id<<endl;
+            //read it
+            char* buffer = BPM->fetchPage(new_page_id);
+            PageHeader* header = reinterpret_cast<PageHeader*>(buffer);
 
-            assert(page_header->page_id == new_page_id);
+            cout<<header->page_id<<endl;
+
+            assert(header->page_id == new_page_id);
         }
 
-        cout<<"testing delete page"<<endl;
+        cout<<"testing delete page from BPM"<<endl;
         {
+            //create a new page, then i will delete it
             int new_page_id = BPM->newPage();
             BPM->deletePage(new_page_id);
-            BPM->fetchPage(new_page_id);
+            char* buffer = BPM->fetchPage(new_page_id);
 
         }
-}
+
+    }
 
 }
+*/

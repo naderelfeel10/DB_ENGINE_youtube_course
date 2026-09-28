@@ -1,226 +1,259 @@
 #include"Buffer/LRU.h"
-#include"Storage/Page/Page.h"
+#include<iostream>
 
-Frame::Frame(int key, char*value){
-    
+Node::Node(int key, char* value){
+
     this->key = key;
     this->value = value;
     this->next = nullptr;
     this->prev = nullptr;
 }
 
+
 LRU::LRU(int capacity){
     
     this->capacity = capacity;
-    //create dummy frames as head and tail
-    this->head = new Frame();
-    this->tail = new Frame();
 
-    //then link them
+    this->head = new Node();
+    this->tail = new Node();
+
     head->next = tail;
     tail->prev = head;
+
 }
 
-void LRU::put_frame(int key, char*value){
+
+void LRU::put_node(int key, char* value){
+
+    //first, check if we have this node or not
+    //if found, then update it's value, then update it's location 
     
-    //check if the page_id already exists :
-    if(frames_map.find(key) != frames_map.end()){
-        //fetch the frame then update it 
-        Frame* curr_frame = frames_map[key];
-        curr_frame->value = value;
-
-        //then update it's position in the double linked list :
+    if(this->nodes_map.find(key) != nodes_map.end()){
         
-        //remove it first, then link 
-        curr_frame->prev->next = curr_frame->next;
-        curr_frame->next->prev = curr_frame->prev;
+        //update old value with new value 
+        Node* curr_node = nodes_map[key];
+        curr_node->value = value;
 
-        //now move it to the first of the list 
-        Frame* head_next = head->next;
+        //udpate the position of the node
+        // make it next to the head
 
-        head_next->prev = curr_frame;
-        curr_frame->next = head_next;
+        //first, remove it : 
+        curr_node->prev->next = curr_node->next;
+        curr_node->next->prev = curr_node->prev;
 
-        head->next = curr_frame;
-        curr_frame->prev = head;
-        
-        return;
+        // move it to the begining of the list :
+        Node* head_next = head->next;
+
+        head_next->prev = curr_node;
+        curr_node->next = head_next;
+
+        head->next = curr_node;
+        curr_node->prev = head;
+
+        return ;
 
     }
-    //check if all frames are occupied: 
-    //then evict the very last frame in the list (prev of tail) 
-    if(frames_map.size() == capacity){
-        
-        //fetch the evicted page, then remove it 
-        Frame* to_delete_frame  = tail->prev;
-        frames_map.erase(to_delete_frame->key);
+    //if not found, then we have to insert it: 
+        // if we have empty room for it, then just insert it as next to the head
+        // if not, we have to evict one (the prev of the Tail)
 
-        //remove it from the list then link
-        to_delete_frame->prev->next = tail;
-        tail->prev = to_delete_frame->prev;
+    //if no space : 
+    if(nodes_map.size() == capacity){
 
-        delete to_delete_frame;
+        //fetch the node to evict : 
+        Node* evicted_node = tail->prev;
+        nodes_map.erase(evicted_node->key);
 
+        //then update the pointers 
+        evicted_node->prev->next = tail;
+        tail->prev = evicted_node->prev;
+
+        delete evicted_node;
     }
 
-    // now insert the new frame as the first (next to head)
-    Frame* new_frame = new Frame(key, value);
-    frames_map[key] = new_frame;
+    // now we have a room for new Node : 
+    // create the new node, then insert it as the first node in the list : 
+    Node* new_node = new Node(key, value);
+    nodes_map[key] = new_node;
 
-    //now move it to the first of the list 
-    Frame* head_next = head->next;
-    head_next->prev = new_frame;
+    // then update the pointers :
 
-    new_frame->next = head_next;
-    head->next = new_frame;
-    new_frame->prev = head;
+    Node* head_next = head->next;
+
+    head_next->prev = new_node;
+    new_node->next = head_next;
+
+    head->next = new_node;
+    new_node->prev = head;
 
     return;
-}
+}   
 
 
 char* LRU::get_frame(int key){
-    
-    //chekc if it's found in the list:
-    if(frames_map.find(key) != frames_map.end()){
 
-        Frame* curr_frame = frames_map[key];
+    //check for the key in nodes_map
+    if(nodes_map.find(key) != nodes_map.end()){
 
-        //remove it, then reinsert as first node
-        curr_frame->prev->next = curr_frame->next;
-        curr_frame->next->prev = curr_frame->prev;
+        Node* curr_node = nodes_map[key];
 
-        //now move it to the first of the list 
-        Frame* head_next = head->next;
-        head_next->prev = curr_frame;
+        //udpate the position of the node
+        // make it next to the head
 
-        curr_frame->next = head_next;
-        head->next = curr_frame;
-        curr_frame->prev = head;
+        //first, remove it : 
+        curr_node->prev->next = curr_node->next;
+        curr_node->next->prev = curr_node->prev;
 
-        return curr_frame->value;
+        // move it to the begining of the list :
+        Node* head_next = head->next;
+
+        head_next->prev = curr_node;
+        curr_node->next = head_next;
+
+        head->next = curr_node;
+        curr_node->prev = head;
+        
+        //return the page_data
+        return curr_node->value;
+        
     }
-
     return nullptr;
 }
-
-
 int LRU::evict_frame(){
 
-    if(tail->prev == head){
-        return -1;
-    }
-    
-    Frame* evicted_frame = tail->prev;
-    int frame_id = evicted_frame->key;
-    frames_map.erase(frame_id);
+    Node* evicted_node = tail->prev;
 
-    evicted_frame->prev->next = tail;
-    tail->prev = evicted_frame->prev;
+    int node_id = evicted_node->key;
 
-    delete evicted_frame;
-    return frame_id;
+    //remove it from the list 
+    nodes_map.erase(node_id);
+
+    evicted_node->prev->next = tail;
+    tail->prev = evicted_node->prev;
+
+    delete evicted_node;
+
+    return node_id;
 }
-
 
 void LRU::remove_frame(int key){
 
-    Frame* evicted_frame = frames_map[key];
+    Node* evicted_node = nodes_map[key];
 
-    int frame_id = evicted_frame->key;
-    frames_map.erase(frame_id);
+    int node_id = evicted_node->key;
 
-    evicted_frame->prev->next = evicted_frame->next;
-    evicted_frame->next->prev = evicted_frame->prev;
+    //remove it from the list 
+    nodes_map.erase(node_id);
 
-    delete evicted_frame;
+    //update the pointers :
+    evicted_node->prev->next = evicted_node->next;
+    evicted_node->next->prev = evicted_node->prev;
+
+    delete evicted_node;
 }
-
 
 void LRU::print(){
-    
-    Frame* curr_frame = head->next;
 
-    while(curr_frame != tail){
-        cout<<curr_frame->key<<", ";
-        curr_frame = curr_frame->next;
-    }
+    Node* curr_node = head->next;
+
+    while(curr_node != tail){
+        cout<<curr_node->key<<", ";
+        curr_node = curr_node->next;
+    } 
 
     cout<<endl;
-}
+}   
 
 /*
 int 
 main(){
-    cout<<"testing put and get"<<endl;
-    {    
+
+    cout<<"testing LRU"<<endl;
+
+    {
         LRU* lru = new LRU(3);
 
         Page* page1 = new Page(1);
         Page* page2 = new Page(2);
         Page* page3 = new Page(3);
 
-        lru->put_frame(1, page1->getData());
-        lru->put_frame(2, page1->getData());
-        lru->put_frame(3, page1->getData());
-    
-        cout<<"put 1 then 2 then 3"<<endl;
+        lru->put_node(1, page1->getData());
+        lru->put_node(2, page2->getData());
+        lru->put_node(3, page3->getData());
+
+        cout<<"3, 2, 1"<<endl;
+        char* page_3_buffer = lru->get_frame(3);
+        assert(page_3_buffer != nullptr);
         lru->print();
 
-        char* page1_buffer =  lru->get_frame(1);
-        assert(page1_buffer != nullptr);
+        cout<<"inserting 4"<<endl;
+        lru->put_node(4, page3->getData());
 
-        cout<<"get 1"<<endl;
+        char* page_1_buffer = lru->get_frame(1);
+        assert(page_1_buffer == nullptr);
+        cout<<"4, 3, 2"<<endl;
         lru->print();
 
-        char* page2_buffer =  lru->get_frame(2);
-        assert(page2_buffer != nullptr);
-
-        cout<<"get 2"<<endl;
-        lru->print();
-
-        char* page3_buffer =  lru->get_frame(3);
-        assert(page3_buffer != nullptr);
-
-        cout<<"get 3"<<endl;
-        lru->print();
-
-        char* page4_buffer =  lru->get_frame(4);
-        assert(page4_buffer == nullptr);
-
-        cout<<"get 4 (not found)"<<endl;
+        cout<<"access page2"<<endl;
+        char* page_2_buffer = lru->get_frame(2);
+        assert(page_2_buffer != nullptr);
+        cout<<"2, 4, 3"<<endl;
         lru->print();
 
     }
-    cout<<"testing evict"<<endl;
-    {    
+
+    cout<<"tesing evict frame"<<endl;
+    {
         LRU* lru = new LRU(3);
 
         Page* page1 = new Page(1);
         Page* page2 = new Page(2);
         Page* page3 = new Page(3);
 
-        lru->put_frame(1, page1->getData());
-        lru->put_frame(2, page1->getData());
-        lru->put_frame(3, page1->getData());
-        
-        cout<<"put 1, 2, 3"<<endl;
-        lru->print();
-        
-        lru->put_frame(4, page1->getData());
+        lru->put_node(1, page1->getData());
+        lru->put_node(2, page2->getData());
+        lru->put_node(3, page3->getData());
 
-        cout<<"put 4"<<endl;
+        cout<<"3, 2, 1"<<endl;
+
+        char* page_3_buffer = lru->get_frame(3);
+        assert(page_3_buffer != nullptr);
         lru->print();
 
-        lru->put_frame(5, page1->getData());
-
-        cout<<"put 5"<<endl;
+        lru->evict_frame();
+        cout<<"3, 2"<<endl;
         lru->print();
 
-        lru->put_frame(6, page1->getData());
+        char* page_1_buffer = lru->get_frame(1);
+        assert(page_1_buffer == nullptr);
 
-        cout<<"put 6"<<endl;
+    }
+
+    cout<<"tesing remove frame"<<endl;
+    {
+        LRU* lru = new LRU(3);
+
+        Page* page1 = new Page(1);
+        Page* page2 = new Page(2);
+        Page* page3 = new Page(3);
+
+        lru->put_node(1, page1->getData());
+        lru->put_node(2, page2->getData());
+        lru->put_node(3, page3->getData());
+
+        cout<<"3, 2, 1"<<endl;
+
+        char* page_3_buffer = lru->get_frame(3);
+        assert(page_3_buffer != nullptr);
         lru->print();
+
+        lru->remove_frame(2);
+        cout<<"3, 1"<<endl;
+        lru->print();
+
+        char* page_2_buffer = lru->get_frame(2);
+        assert(page_2_buffer == nullptr);
+
     }
 }
 */
