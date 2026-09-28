@@ -3,7 +3,7 @@
 
 Tuple::Tuple(vector<Field>fields){
     //loop over the fields, then push to our vector
-
+    size = sizeof(is_deleted) + sizeof(size);
     for(auto& f : fields){
         this->fields.push_back(f);
         this->size += f.get_serialized_size();
@@ -18,9 +18,16 @@ bool Tuple::get_is_deleted(){
     return this->is_deleted;
 }
 
-int  Tuple::get_tuple_size(){
-    return this->size;
+int Tuple::get_tuple_size(){
+    int total_size = sizeof(this->is_deleted) + sizeof(this->size);
+
+    for(auto& field : fields){
+        total_size += field.get_serialized_size();
+    }
+
+    return total_size;
 }
+
 
 vector<Field> Tuple::get_tuple_fields(){
     return this->fields;
@@ -93,7 +100,7 @@ void Tuple::deserialize_tuple(char* buffer){
         Field f(FieldType::TYPE_INT);
         f.deserialize_field(buffer + offset);
         offset += f.get_serialized_size();
-
+        //f.print_field();
         fields.push_back(f);
     }
 

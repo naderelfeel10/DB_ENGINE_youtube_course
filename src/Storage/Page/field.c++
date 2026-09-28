@@ -154,7 +154,7 @@ void Field::serialize_field(char* buffer){
     case FieldType::TYPE_STRING:
         buffer[0] = 'S';
         memcpy(buffer+offset , this->VALUE_STRING, size);
-        buffer[offset+size] = '\0';
+        //buffer[offset+size] = '\0';
         offset+= size;
         break;
 

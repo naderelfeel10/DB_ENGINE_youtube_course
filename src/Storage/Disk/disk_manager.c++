@@ -141,7 +141,7 @@ size_t DiskManager::allocate_page(){
     DB_file.write(new_page->getData(), PAGE_SIZE);
     DB_file.flush();
 
-    //pages_dir[page_id] = offset;
+    pages_dir[page_id] = offset;
 
     delete new_page;
 

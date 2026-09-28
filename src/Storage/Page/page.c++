@@ -25,6 +25,7 @@ int Page::insert_tuple(Tuple tuple){
 
     // check if there is enough space
     int tuple_size = tuple.get_tuple_size();
+    tuple_size = (tuple_size+7)& ~7; // padding 
 
     PageHeader* header = reinterpret_cast<PageHeader*>(data);
     
@@ -158,7 +159,6 @@ int Page::update_tuple(int slot_num, Tuple new_tuple){
 
     return slot_num;
 
-
 }
 
 
@@ -203,6 +203,8 @@ main(){
         assert(5 == page.get_page_id());
 
         int slot_num = page.insert_tuple(tuple);
+        int slot_num2 = page.insert_tuple(tuple);
+
         tuple.print_tuple();
         cout<<endl;
 
@@ -257,5 +259,4 @@ main(){
         cout<<endl;
 
     }
-}
-*/
+}*/
