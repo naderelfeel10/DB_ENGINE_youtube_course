@@ -15,8 +15,6 @@ using namespace std;
 class TableHeap{
     
 private:
-    
-    BufferPoolManager* BPM;
 
     //table meta-data
     string table_name;
@@ -33,7 +31,10 @@ private:
     RID stoping_rid;
 
 public:
+
     TableHeap(BufferPoolManager* BPM, vector<Column>schema, string table_name, int table_id);
+    
+    BufferPoolManager* BPM;
 
     //crud:
     RID insert_tuple(Tuple tuple);
@@ -42,6 +43,9 @@ public:
     bool delete_tuple(RID rid);
 
     bool check_schema(Tuple tuple);
+
+    RID get_starting_rid();
+    RID get_stopping_rid();
 
     int get_table_id();
     string get_table_name();

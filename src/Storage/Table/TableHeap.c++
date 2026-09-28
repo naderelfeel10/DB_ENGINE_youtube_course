@@ -10,7 +10,7 @@ TableHeap::TableHeap(BufferPoolManager* BPM, vector<Column>schema, string table_
 
     //then allocate pages for the table :
     this->first_page_id = BPM->newPage();
-    this->last_page_id = BPM->newPage();
+    this->last_page_id = first_page_id;
 
     this->starting_rid = RID(first_page_id, 0);
 
@@ -193,8 +193,13 @@ void TableHeap::delete_table(){
     }
     
 }
-
-
+RID TableHeap::get_starting_rid(){
+    return this->starting_rid;
+}
+RID TableHeap::get_stopping_rid(){
+    return this->stoping_rid;
+}
+/*
 int 
 main(){
 
@@ -317,3 +322,4 @@ main(){
 
 
 }
+*/

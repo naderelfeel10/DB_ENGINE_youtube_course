@@ -8,6 +8,7 @@ Page::Page(int page_id){
     PageHeader* header = reinterpret_cast<PageHeader*>(data);
 
     header->page_id = page_id;
+    header->next_page_id = -1;
     header->num_of_deleted_tuples = 0;
     header->num_of_tuples = 0;
     header->offset_pointer = PAGE_SIZE;
