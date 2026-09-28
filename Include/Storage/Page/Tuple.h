@@ -12,7 +12,7 @@ private:
     vector<Field>fields;
 
     //meta data : 
-    bool is_deleted;
+    bool is_deleted{false};
     int size;
 
 public:
@@ -31,4 +31,9 @@ public:
     
     void serialize_tuple(char* buffer);
     void deserialize_tuple(char* buffer);
+
+    vector<Field> get_fields(){
+        return this->fields;
+    }
+    
 };

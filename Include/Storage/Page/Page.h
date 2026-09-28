@@ -6,6 +6,7 @@
 //contains meta data about the page
 struct PageHeader{
     int page_id;
+    int next_page_id{-1};
     int num_of_tuples;
     int num_of_deleted_tuples;
     int offset_pointer;
