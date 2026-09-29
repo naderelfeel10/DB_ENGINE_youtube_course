@@ -1,4 +1,5 @@
 #include"Storage/Table/RID.h"
+
 #include<iostream>
 
 
@@ -11,5 +12,5 @@ int RID::get_slot_num(){
 }
 
 void RID::print(){
-    std::cout<<"("<<this->page_id<<", "<<this->slot_num<<")"<<std::endl;
+    std::cout<<"("<<page_id<<", "<<slot_num<<")"<<std::endl;
 }

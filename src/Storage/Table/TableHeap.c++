@@ -1,228 +1,182 @@
 #include"Storage/Table/TableHeap.h"
 
 
-TableHeap::TableHeap(BufferPoolManager* BPM, vector<Column>schema, string table_name, int table_id){
+
+TableHeap::TableHeap(BufferPoolManager* BPM,vector<Column> schema, string table_name, int table_id){
+    
+    //set the meta data:
+    this->schema = schema = schema;
+    this->table_id = table_id;
+    this->table_name = table_name;
 
     this->BPM = BPM;
-    this->schema = schema;
-    this->table_name = table_name;
-    this->table_id = table_id;
 
-    //then allocate pages for the table :
-    this->first_page_id = BPM->newPage();
-    this->last_page_id = first_page_id;
+    //then create the first page in the table 
+    
+    first_page_id =  BPM->newPage();
+    last_page_id = first_page_id;
 
     this->starting_rid = RID(first_page_id, 0);
 
-    cout<<table_name + "'s first p_id : "<<this->first_page_id<<endl;
-    cout<<table_name + "'s last p_id : "<<this->last_page_id<<endl;
-
+    cout<<table_name+"'s first page id : "<<first_page_id<<endl;
+    cout<<table_name+"'s last page id : "<<last_page_id<<endl;
 }
 
-bool TableHeap::check_schema(Tuple tuple){
-    
-    
-    vector<FieldType> fields_types;
 
+bool TableHeap::check_schema(Tuple tuple){
+
+    //check if fields types match : 
+    vector<FieldType>fields_types;
     for(auto& f: tuple.get_fields()){
         fields_types.push_back(f.get_field_type());
     }
 
-    if(schema.size() != fields_types.size()){
+    if(fields_types.size() != schema.size()){
         return false;
     }
+
     for(int i{};i<schema.size();i++){
         if(this->schema[i].get_field_type() != fields_types[i]){
             return false;
         }
     }
-
     return true;
-}
+}   
 
 RID TableHeap::insert_tuple(Tuple tuple){
 
-    //first check the schema : 
-    
-    bool is_schema_matched = this->check_schema(tuple);
 
-    if(is_schema_matched == false){
-        throw runtime_error("schemas don't match");
+    //check for the tuple schema first : 
+    bool is_schema_valid = check_schema(tuple);
+
+
+    if(is_schema_valid == false){
+        throw runtime_error("tuple schemas don't match");
     }
 
-    //fetch the last page in our table: 
-    //then try to insert
-    //if no space then :
-        //1. create new page
-        //2. update last_page_id to the newly created page
-    
-    
-    
-    //fetch the last page : 
-    char* last_page_buffer = this->BPM->fetchPage(last_page_id);
-    Page* last_page = reinterpret_cast<Page*>(last_page_buffer);
-    PageHeader* page_header = reinterpret_cast<PageHeader*>(last_page_buffer);
+    //fetch the last page 
+    //then we try to insert : 
+        // if no space : 
+        // create a new page 
 
-    int slot_num = last_page->insert_tuple(tuple);
+    //fetch the last_page
+    char* page_buffer = BPM->fetchPage(last_page_id);
+    Page* page = reinterpret_cast<Page*>(page_buffer);
+    PageHeader* page_header = reinterpret_cast<PageHeader*>(page_buffer);
 
-    //if this slot num is -1, means no space left in this page,
+    //try to insert : 
+    int slot_num = page->insert_tuple(tuple);
+
+    //check if the page has space : 
     if(slot_num == -1){
-
-        //create new page: 
+        //no space, then allocate new page : 
         int new_page_id = BPM->newPage();
         page_header->next_page_id = new_page_id;
 
         BPM->mark_as_dirty(last_page_id);
+
         this->last_page_id = new_page_id;
 
-        //try again with the new page
-        
-        RID lst_rid = this->insert_tuple(tuple);
-        return lst_rid;
+        //try to insert again : 
+        RID rid = this->insert_tuple(tuple);
+        return rid;
     }
+    
+    //if we have space 
     BPM->mark_as_dirty(last_page_id);
-    
     this->num_of_tuples++;
-    //cout<<"number of tuples : "<<num_of_tuples<<endl;
 
-    //update stopping rid :
-    this->stoping_rid = RID(last_page_id, slot_num);
+    stopping_rid = RID(last_page_id, slot_num);
 
-    return stoping_rid;
-    
+    return stopping_rid;
 }
+
 Tuple* TableHeap::get_tuple(RID rid){
-    //fetch the page, then use it to get the tuple
-    int page_id = rid.get_page_id(); 
-    int slot_num = rid.get_slot_num(); 
 
-    cout<<page_id<<", "<<slot_num<<endl;
+    //page_id, slot_nuum
+    //fetch the page using page_id
+    //then find the tuple with the slot num inside this page
 
+    int page_id = rid.get_page_id();
+    int slot_num = rid.get_slot_num();
+    
     char* page_buffer = BPM->fetchPage(page_id);
     Page* page = reinterpret_cast<Page*>(page_buffer);
 
     Tuple* tuple = new Tuple({});
-    bool is_found = page->get_tuple(slot_num, *tuple);
-    //tuple->print_tuple();
+    bool is_found =  page->get_tuple(slot_num, *tuple);
+
     return tuple;
 }
 
-
-RID TableHeap::update_tuple(RID rid, Tuple tuple){
-
-    //first check the schema : 
+RID TableHeap::update_tuple(RID rid, Tuple new_tuple){
     
-    bool is_schema_matched = this->check_schema(tuple);
+    //check for the tuple schema first : 
+    bool is_schema_valid = check_schema(new_tuple);
 
-    if(is_schema_matched == false){
-        throw runtime_error("schemas don't match");
+
+    if(is_schema_valid == false){
+        throw runtime_error("tuple schemas don't match");
     }
 
-    //fetch the old tuple, compare sizes, the choose whether to overwrite or to delete and reinsert
-    
     //fetch the page : 
     int page_id = rid.get_page_id();
+    int slot_num = rid.get_slot_num();
+    
     char* page_buffer = BPM->fetchPage(page_id);
     Page* page = reinterpret_cast<Page*>(page_buffer);
 
-    int slot_num = rid.get_slot_num();
-    //try to update
-    int new_slot_num = page->update_tuple(slot_num, tuple);
-    //if new slot num is -1, means : 
-        // new tuple size > old tuple siz, so we have to delete the old one, then reinsert the new one
+    int new_slot_num = page->update_tuple(slot_num, new_tuple);
+
+    //check if it's inserted into the old page 
     if(new_slot_num == -1){
-        RID new_rid = this->insert_tuple(tuple);
+        RID new_rid = this->insert_tuple(new_tuple);
         return new_rid;
     }
-    //if not, then I will just update the new slot num:
+
+    //else : means we have updated it in the same old page ; 
     RID new_rid = RID(page_id, new_slot_num);
     return new_rid;
 }
-
 bool TableHeap::delete_tuple(RID rid){
 
-    //fetch the page, then delete it :
+    //fetch the page, then try to delete 
     int page_id = rid.get_page_id();
+    int slot_num = rid.get_slot_num();
+    
     char* page_buffer = BPM->fetchPage(page_id);
-
     Page* page = reinterpret_cast<Page*>(page_buffer);
 
-    int slot_num = rid.get_slot_num();
-    bool is_deleted = page->delete_tuple(slot_num);
+    bool is_deleted =  page->delete_tuple(slot_num);
 
     this->num_of_tuples--;
-
     return is_deleted;
 }
 
-int TableHeap::get_table_id(){
-    return this->table_id;
-}
-string TableHeap::get_table_name(){
-    return this->table_name;
-}
-
-void TableHeap::set_table_name(string new_name){
-    this->table_name = new_name;
-}
-
-
-void TableHeap::delete_table(){
-
-    //we have to delete all of it's pages from the file : 
-    
-    int curr_page_id = this->first_page_id;
-    
-    while (curr_page_id != -1){
-        
-        //fetch the page 
-        //delete it
-        //fetch it's next page in the linked list
-        char* page_buffer = this->BPM->fetchPage(curr_page_id);
-        //check if nullptr
-        if(page_buffer == nullptr){
-            throw runtime_error("page buffer is nullptr");
-        } 
-
-        PageHeader* header = reinterpret_cast<PageHeader*>(page_buffer);
-        int next_page_id = header->next_page_id;
-
-        BPM->deletePage(curr_page_id);
-
-        curr_page_id = next_page_id;
-    }
-    
-}
-RID TableHeap::get_starting_rid(){
-    return this->starting_rid;
-}
-RID TableHeap::get_stopping_rid(){
-    return this->stoping_rid;
-}
 /*
 int 
 main(){
 
-    const string file_name = "DB2.bin";
+    const string file_name = "DB.bin";
     DiskManager* dm = new DiskManager(file_name);
 
     BufferPoolManager* BPM = new BufferPoolManager(dm);
 
+
     string table_name = "User";
     int table_id = 1;
-    
-    vector<Column>schema;
+
+    vector<Column> schema;
     schema.push_back(Column(FieldType::TYPE_INT, "id", sizeof(int)));
     schema.push_back(Column(FieldType::TYPE_DOUBLE, "grade", sizeof(double)));
-    schema.push_back(Column(FieldType::TYPE_STRING, "name", 30));
+    schema.push_back(Column(FieldType::TYPE_STRING, "name", 50 ));
 
 
     TableHeap* table_heap = new TableHeap(BPM, schema, table_name, table_id);
 
-    vector<Field>fields;
-    //create dummy tuple
-    {
 
+    vector<Field>fields;
+    {
     {
         FieldType type = FieldType::TYPE_INT;
         int value = 9;
@@ -231,7 +185,6 @@ main(){
 
         fields.push_back(f);
     }
-
     {
         FieldType type = FieldType::TYPE_DOUBLE;
         double value = 9.1234;
@@ -240,7 +193,6 @@ main(){
         fields.push_back(f);
         
     }
-
     {
         FieldType type = FieldType::TYPE_STRING;
         const char* value = "ELFEEL";
@@ -249,77 +201,54 @@ main(){
         fields.push_back(f);
         
     }
-
     }
-
-    //create the tuple :
+        //create the tuple :
     Tuple tuple(fields);
 
-    cout<<"testing inserting 100 tuple"<<endl;
-    int i{};
-    while(i++<100){
+
+    cout<<"testing insert tuple to a table"<<endl;
+    {
         RID rid = table_heap->insert_tuple(tuple);
         rid.print();
-        //Tuple* t1 = table_heap->get_tuple(rid);
-        //t1->print_tuple();
+
+        rid = table_heap->insert_tuple(tuple);
+        rid.print();
+    }
+    cout<<"stress testing insert tuple to a table"<<endl;
+    {
+        int i{};
+        while(i++<100){
+            RID rid = table_heap->insert_tuple(tuple);
+            rid.print();
+        }
     }
 
-    cout<<"testing get tuple from rid"<<endl;
+    cout<<"testing get tuple from the rid "<<endl;
     {
-        RID rid1 = RID(2,0);
-        Tuple* t1 = table_heap->get_tuple(rid1);
-        t1->print_tuple();
-    }
-    {
-        RID rid1 = RID(2,12);
-        Tuple* t1 = table_heap->get_tuple(rid1);
-        t1->print_tuple();
-    }
-    {
-        RID rid1 = RID(3,0);
-        Tuple* t1 = table_heap->get_tuple(rid1);
-        t1->print_tuple();
-    }
-    {
-        RID rid1 = RID(3,12);
-        Tuple* t1 = table_heap->get_tuple(rid1);
-        t1->print_tuple();
-    }
-    {
-        RID rid1 = RID(3,15);
-        Tuple* t1 = table_heap->get_tuple(rid1);
-        t1->print_tuple();
+        RID rid = RID(2, 32);
+        Tuple* t = table_heap->get_tuple(rid);
+        t->print_tuple();
     }
 
-
-    cout<<"testing update tuple "<<endl;
+    cout<<"testing update tuple"<<endl;
     {
-        //fields.push_back(Field(FieldType::TYPE_BOOL, true));
-        //fields.push_back(Field(FieldType::TYPE_STRING, "NADER"));
-
         fields[2] = Field(FieldType::TYPE_STRING, "NADER");
         Tuple new_tuple = Tuple(fields);
-        RID rid = RID(3,10);
-        
+        RID rid = RID(2, 32);
         RID new_rid = table_heap->update_tuple(rid, new_tuple);
-        new_rid.print();
 
-        Tuple* t1 = table_heap->get_tuple(new_rid);
-        t1->print_tuple();
-
+        Tuple* t = table_heap->get_tuple(new_rid);
+        t->print_tuple();
     }
-
-    cout<<"testing delete tuple "<<endl;
+    
+    cout<<"testing delete tuple from the rid "<<endl;
     {
+        RID rid = RID(2, 32);
+        bool res = table_heap->delete_tuple(rid);
 
-        RID rid = RID(3,10);
-        
-        table_heap->delete_tuple(rid);
-
-        Tuple* t1 = table_heap->get_tuple(rid);
-        t1->print_tuple();
+        Tuple* t = table_heap->get_tuple(rid);
+        t->print_tuple();
     }
-
 
 }
 */
