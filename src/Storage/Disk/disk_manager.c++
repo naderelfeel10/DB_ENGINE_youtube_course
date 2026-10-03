@@ -224,7 +224,6 @@ void DiskManager::save_dm(){
 
 }
 
-
 void DiskManager::load_dm(){
 
     cout<<"loading the meta data of this file "<<endl;
@@ -290,6 +289,18 @@ void DiskManager::load_dm(){
 
 
 }
+
+DiskManager::~DiskManager(){
+    cout<<"saving dm"<<endl;
+    if(DB_file.is_open()){
+        DB_file.clear();
+        save_dm();
+        DB_file.close();
+    }
+    cout<<"dm is saved"<<endl;
+}
+
+
 /*
 int 
 main(){

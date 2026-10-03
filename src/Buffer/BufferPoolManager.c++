@@ -129,7 +129,7 @@ int BufferPoolManager::newPage(){
     //update the tables : 
     pages_ids[frame_id] = new_page_id;
     pages_table[new_page_id] = frame_id;
-    is_dirty[frame_id] = false;
+    is_dirty[frame_id] = true;
 
     this->lru->put_node(frame_id, frames[frame_id]);
     return new_page_id;
@@ -159,7 +159,30 @@ void BufferPoolManager::deletePage(int page_id){
 void BufferPoolManager::mark_as_dirty(int page_id){
     int frame_id = pages_table[page_id];
     is_dirty[frame_id] = true;
-}   
+}
+
+
+BufferPoolManager::~BufferPoolManager(){
+    cout<<"deleting BPM"<<endl;
+    for(int i{};i<BUFFER_SIZE;i++){
+
+        int page_id = pages_ids[i];
+
+        if(pin_counter[i] > 0) {
+            cerr <<"Warning: Page"<<pages_ids[i] 
+                      <<" still has "<<pin_counter[i]<<" pins during shutdown."<<endl;
+        }
+
+        if(is_dirty[i] && page_id != -1)
+            disk_manager->write_page(page_id, frames[i]);
+
+        if(frames[i]!=nullptr)
+            delete[] frames[i];
+    }
+    this->disk_manager->~DiskManager();
+    cout<<"BPM is deleted"<<endl;
+
+}
 /*
 int 
 main(){

@@ -43,5 +43,6 @@ public:
     void save_dm();
     void load_dm();
 
+    ~DiskManager();
 
 };

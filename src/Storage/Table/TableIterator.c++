@@ -49,7 +49,7 @@ bool TableIterator::end(){
     return page_id == -1;
 }
 
-
+/*
 int main(){
 
     const string file_name = "DB.bin";
@@ -129,3 +129,4 @@ int main(){
         }
     }
 }
+*/

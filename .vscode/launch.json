@@ -6,10 +6,10 @@
             "type": "cppdbg",
             "request": "launch",
             //"program": "${workspaceFolder}/test/test_multiple_tables.exe",
-            "program": "${workspaceFolder}/src/Storage/Table/table_heap.exe",
+            "program": "${workspaceFolder}/src/Catalog/table_heap.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/src/Storage/Table",
+            "cwd": "${workspaceFolder}/src/Catalog/",
             "externalConsole": true,
             "MIMode": "gdb"
         }

@@ -39,5 +39,5 @@ public:
     void deletePage(int page_id);
 
     void mark_as_dirty(int page_id);
-
+    ~BufferPoolManager();
 };

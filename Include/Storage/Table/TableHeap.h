@@ -42,4 +42,11 @@ public:
     RID get_last_rid(){
         return this->stopping_rid;
     }
+
+    int get_first_page_id(){
+        return this->first_page_id;
+    }
+    int get_lst_page_id(){
+        return this->last_page_id;
+    }
 };
