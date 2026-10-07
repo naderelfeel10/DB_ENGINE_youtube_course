@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             //"program": "${workspaceFolder}/test/test_multiple_tables.exe",
-            "program": "${workspaceFolder}/src/Catalog/table_heap.exe",
+            "program": "${workspaceFolder}/src/Catalog/catalog.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/src/Catalog/",

@@ -5,7 +5,7 @@
 TableHeap::TableHeap(BufferPoolManager* BPM,vector<Column> schema, string table_name, int table_id){
     
     //set the meta data:
-    this->schema = schema = schema;
+    this->schema = schema;
     this->table_id = table_id;
     this->table_name = table_name;
 
