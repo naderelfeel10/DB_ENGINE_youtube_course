@@ -1,167 +1,465 @@
-#include"Storage/Indexing/BPlusTreeIndex.h"
+#include"Storage/Indexing/BPLusTreeIndex.h"
 
 
 
-void BPlusTree::insert(Field key, RID value){
 
-    //the is empty : 
+void BPLusTree::insert(Field key, RID value){
+
+    //if it's the first entry in the tree, then create a new root;
     if(root == nullptr){
 
-        //create a new node
-        root = new Node(true);
-        
-        //create it's page as well 
-        root->curr_page_id = BPM->newPage();
-        
-        //insett the entry into entries 
-        Entry entry =  Entry(key, value);
+        //create new node :
+        root = new BPlusNode(true);
+
+        //create page for this new node
+        root->page_id = BPM->newPage();
+
+        Entry entry = Entry(key, value);
         root->entries.push_back(entry);
-
         root->keys.push_back(key);
-    }else{
-        //check if the root is full : 
-        int root_size = root->is_leaf ? root->entries.size() : root->keys.size();
-        //if full, create new node, and split the old root and update curr_root
-        if(root_size == 2*t-1){
-            //create new node
-            Node* new_root = new Node(false);
-            new_root->curr_page_id = BPM->newPage();
 
-            //assign old root as child of new root, then split the old root 
+        //save this node on disk
+        char* page_buffer = BPM->fetchPage(root->page_id);
+        root->serialize(page_buffer);
+        BPM->mark_as_dirty(root->page_id);
+
+    }else{
+
+        //check if the node is full or not 
+        int root_size = root->is_leaf? root->entries.size() : root->keys.size();
+        if(root_size == 2*t-1){
+            
+            BPlusNode* new_root = new BPlusNode(false);
+
+            //create page for this new node
+            new_root->page_id = BPM->newPage();
+        
             new_root->children.push_back(root);
-            new_root->children_pages_ids.push_back(root->curr_page_id);
+            new_root->childern_pages_ids.push_back(root->page_id);
 
             splitChild(new_root, 0, root);
             root = new_root;
-        }
-        //insert it normally 
-        insertNonFull(root, key, value);
-    }
 
+            //save this node on disk
+            char* page_buffer = BPM->fetchPage(new_root->page_id);
+            new_root->serialize(page_buffer);
+            BPM->mark_as_dirty(new_root->page_id);
+        }
+        //insert the new entry : 
+        insertNonFull(root, key, value);
+
+    }
 }
 
 
-void BPlusTree::splitChild(Node* parent, int index, Node* child){
+void BPLusTree::splitChild(BPlusNode* parent, int index, BPlusNode* child){
+    
+    BPlusNode* new_child = new BPlusNode(child->is_leaf);
+    new_child->page_id = BPM->newPage();
 
-    //create a new child :
-    bool is_leaf = child->is_leaf;
-    Node* new_child = new Node(is_leaf);
-    new_child->curr_page_id = BPM->newPage();
-
-    //check weather the node is leaf or not : 
     if(child->is_leaf){
-        //split the entries, keys between child, and new child
-        new_child->entries.assign(child->entries.begin() + t -1, child->entries.end());
-        child->entries.resize(t-1);
+
+        new_child->entries.assign(
+            child->entries.begin() + (t - 1),
+            child->entries.end()
+        );
+
+        child->entries.erase(
+            child->entries.begin() + (t - 1),
+            child->entries.end()
+        );
 
         child->keys.clear();
-        for(const auto&e:child->entries){
-            child->keys.push_back(e.key);
+        for (const auto& entry : child->entries) {
+            child->keys.push_back(entry.key);
         }
 
         new_child->keys.clear();
-        for(const auto&e:new_child->entries){
-            new_child->keys.push_back(e.key);
+        for (const auto& entry : new_child->entries) {
+            new_child->keys.push_back(entry.key);
         }
 
-        // insert the first key of the right child to the parent:
-        parent->keys.insert(parent->keys.begin()+index, new_child->entries[0].key);
+        parent->keys.insert(
+            parent->keys.begin() + index,
+            new_child->entries.front().key
+        );
 
-        //update pointers 
+        new_child->next = child->next;
         new_child->next_page_id = child->next_page_id;
-        new_child->next = child->next;
-
-        child->next_page_id = new_child->curr_page_id;
-        new_child->next = child->next;
-        child->next_page_id = new_child->curr_page_id;
-        child->next = new_child;
-    
-    }else{
-
-        //if it's not leaf node:
-        //insert the t-th key into the parent 
-        parent->keys.insert(parent->keys.begin()+index, child->keys[t-1]);
-
-        //split the entries, keys between child, and new child
-        new_child->keys.assign(child->keys.begin() + t, child->keys.end());
-        child->keys.resize(t - 1);
         
-        new_child->children_pages_ids.assign(child->children_pages_ids.begin() + t, child->children_pages_ids.end());
-        child->children_pages_ids.resize(t);
-
-        new_child->children.assign(child->children.begin() + t, child->children.end());
-        child->children.resize(t);        
-
+        child->next = new_child;
+        child->next_page_id = new_child->page_id;
     }
-    //finally insert the new child to parent childs: 
-    parent->children.insert(parent->children.begin()+index+1, new_child);
+    else
+    {
+        Field middle_key = child->keys[t - 1];
 
-    parent->children_pages_ids.insert(parent->children_pages_ids.begin()+index+1, new_child->curr_page_id);
+        parent->keys.insert(
+            parent->keys.begin() + index,
+            middle_key
+        );
 
+        new_child->keys.assign(
+            child->keys.begin() + t,
+            child->keys.end()
+        );
+
+        child->keys.erase(
+            child->keys.begin() + (t - 1),
+            child->keys.end()
+        );
+
+        new_child->children.assign(
+            child->children.begin() + t,
+            child->children.end()
+        );
+
+        child->children.erase(
+            child->children.begin() + t,
+            child->children.end()
+        );
+    }
+
+    parent->children.insert(parent->children.begin() + index + 1, new_child);
+
+    parent->childern_pages_ids.insert(parent->childern_pages_ids.begin() + index + 1,
+         new_child->page_id);
+
+
+    char* parent_buf = BPM->fetchPage(parent->page_id);
+    parent->serialize(parent_buf);
+    BPM->mark_as_dirty(parent->page_id);
+
+    char* child_buf = BPM->fetchPage(child->page_id);
+    child->serialize(child_buf);
+    BPM->mark_as_dirty(child->page_id);
+
+    char* new_child_buf = BPM->fetchPage(new_child->page_id);
+    new_child->serialize(new_child_buf);
+    BPM->mark_as_dirty(new_child->page_id);
 }
 
-void BPlusTree::insertNonFull(Node* node, Field key, RID value){
 
-    if(node->is_leaf){
-        //insert the key in the correct position
-        auto it = lower_bound(node->entries.begin(), node->entries.end(), key, 
-            [](Entry& e, Field& k){return e.key < k;});
+void BPLusTree::insertNonFull(BPlusNode* root, Field key, RID value){
 
-        node->entries.insert(it, Entry(key, value));
+    if(root->is_leaf == true){
 
-        node->keys.clear();
-        for (const auto& entry : node->entries) {
-            node->keys.push_back(entry.key);
-        }    
+        //insert into the correct position : 
+        auto it = lower_bound(root->entries.begin(), root->entries.end(), key, 
+        [](const Entry& e, const Field&k){return e.key < k;});
 
-        char* page_buffer = BPM->fetchPage(node->curr_page_id);
-        node->serialize(page_buffer);
-        BPM->mark_as_dirty(node->curr_page_id);
-    
-    }
-    //if the node is internal node 
-    else {
-        
-        //find the index of the key to insert : 
-        int i= node->keys.size()-1;
-        while(i>=0 && key < node->keys[i]){
+        root->entries.insert(it, Entry(key, value));
+
+        root->keys.clear();
+        for(const auto&e:root->entries){
+            root->keys.push_back(e.key);
+        }
+
+    }else{
+        int i = root->keys.size()-1;
+        while(i>=0 && key < root->keys[i]){
             i--;
         }
         i++;
 
-        if (node->children.size() <= i) {
-            node->children.resize(node->children_pages_ids.size(), nullptr);
-        }
-        //now load the child in order to insert data into
-        if (node->children[i] == nullptr) {
-            node->children[i] = loadNode(node->children_pages_ids[i]);
-        } 
+        BPlusNode* child = root->children[i];
+        int size = child->is_leaf ? child->entries.size() : child->keys.size();
 
-        Node* child = node->children[i];
-        size_t child_size = child->is_leaf ? child->entries.size() : child->keys.size();
-
-        //if the internal node is alos full, then split it
-        //then get the new child
-        if(child_size == 2 * t - 1){ 
-
-            splitChild(node, i, child);
-
-            if (key > node->keys[i]) {
+        if(size == 2*t-1){  
+            splitChild(root, i, child);
+            if(key > root->keys[i]){
                 i++;
             }
-            child = node->children[i];
+            child = root->children[i];
         }
 
-        //insertt again
+        //insert it again  : 
         insertNonFull(child, key, value);
         
-        char* page_buffer = BPM->fetchPage(node->curr_page_id);
-        node->serialize(page_buffer);
-        BPM->mark_as_dirty(node->curr_page_id);
+    }
 
+    char* page_buffer = BPM->fetchPage(root->page_id);
+    root->serialize(page_buffer);
+    BPM->mark_as_dirty(root->page_id);
+}
+
+void BPLusTree::printTree(){
+
+    if (root == nullptr)
+    {
+        cout << "Tree is empty\n";
+        return;
+    }
+
+    vector<BPlusNode*> current_level;
+    current_level.push_back(root);
+
+    int level = 0;
+
+    while (!current_level.empty())
+    {
+        cout << "Level "
+             << level
+             << ": ";
+
+        vector<BPlusNode*> next_level;
+
+        for (BPlusNode* node : current_level)
+        {
+            cout << "[";
+
+            for (size_t i = 0;
+                 i < node->keys.size();
+                 ++i)
+            {
+                node->keys[i].print_field();
+
+                if (i + 1 < node->keys.size())
+                {
+                    cout << " | ";
+                }
+            }
+
+            cout << "] ";
+
+            if (!node->is_leaf)
+            {
+                for (BPlusNode* child : node->children)
+                {
+                    next_level.push_back(child);
+                }
+            }
+        }
+
+        cout << "\n";
+
+        current_level = next_level;
+        ++level;
     }
 }
 
-bool BPlusTree::search(Field key){
+void BPLusTree::printLeaves(){
+    if (root == nullptr)
+    {
+        cout << "Leaf chain is empty\n";
+        return;
+    }
 
+    BPlusNode* node = root;
+
+    while (!node->is_leaf)
+    {
+        node = node->children.front();
+    }
+
+    cout << "Leaf chain:\n";
+
+    while (node != nullptr)
+    {
+        cout << "[";
+
+        for (size_t i = 0;
+             i < node->entries.size();
+             ++i)
+        {
+            node->entries[i].key.print_field();
+
+            if (i + 1 < node->entries.size())
+            {
+                cout << " | ";
+            }
+        }
+
+        cout << "]";
+
+        if (node->next != nullptr)
+        {
+            cout << " -> ";
+        }
+
+        node = node->next;
+    }
+
+    cout << "\n";
+}
+
+
+
+//save entry to disk
+int Entry::serialize(char* data){
+    int offset{0};
+
+    key.serialize_field(data+offset);
+    offset+=key.get_serialized_size();
+
+    value.serialize(data+offset);
+    offset+=value.getSerializedSize();
+
+    return offset;
+}
+
+
+//load entry from disk
+int Entry::deserialize(char* data){
+
+    int offset{0};
+
+    this->key.deserialize_field(data+offset);
+    offset+=this->key.get_serialized_size();
+
+    this->value.deserialize(data+offset);
+    offset+=this->value.getSerializedSize();
+    
+    return offset;
+}
+
+
+//saving each node in one full page
+void BPlusNode::serialize(char* data){
+
+    int offset = sizeof(PageHeader);
+
+    //save is_leaf: 
+    memcpy(data + offset, &is_leaf, sizeof(is_leaf));
+    offset += sizeof(is_leaf);
+
+    //save next page id
+    memcpy(data + offset, &next_page_id, sizeof(next_page_id));
+    offset += sizeof(next_page_id);
+
+    //save children pages_ids:
+    //save vector size first : 
+    int childern_size = childern_pages_ids.size();
+    
+    memcpy(data + offset, &childern_size, sizeof(childern_size));
+    offset += sizeof(childern_size);   
+
+    for(auto& id: childern_pages_ids){
+        memcpy(data + offset, &id, sizeof(id));
+        offset += sizeof(id);
+    }
+
+    //save entries 
+    //save entries size : 
+    int entries_size = entries.size();
+    
+    memcpy(data + offset, &entries_size, sizeof(entries_size));
+    offset += sizeof(entries_size);  
+
+    for(auto& entry: entries){
+        int size =  entry.serialize(data + offset);
+        offset += size;
+    }
+
+    //save keys 
+    //save keys size : 
+    int keys_size = keys.size();
+    
+    memcpy(data + offset, &keys_size, sizeof(keys_size));
+    offset += sizeof(keys_size);  
+
+    for(auto& key: keys){
+        key.serialize_field(data + offset);
+        offset += key.get_serialized_size();
+    }
+
+}
+
+
+void BPlusNode::deserialize(char* data){
+
+    int offset = sizeof(PageHeader);
+
+    //load is_leaf
+    memcpy(&is_leaf, data + offset, sizeof(is_leaf));
+    offset += sizeof(is_leaf);
+    
+    // load next page ID
+    memcpy(&next_page_id, data + offset, sizeof(next_page_id));
+    offset += sizeof(next_page_id);
+
+    // load children page ids size
+    int children_size = 0;
+
+    memcpy(&children_size,data + offset,sizeof(children_size));
+    offset += sizeof(children_size);
+
+    //load children ids
+    childern_pages_ids.clear();
+    childern_pages_ids.reserve(children_size);
+
+    for(int i{};i<children_size; ++i){
+
+        int page_id = -1;
+        memcpy(&page_id, data + offset, sizeof(page_id));
+        offset += sizeof(page_id);
+
+        childern_pages_ids.push_back(page_id);
+    }
+
+    children.clear();
+    children.resize(children_size, nullptr);
+
+    // load entries count
+    int entries_size = 0;
+
+    memcpy(&entries_size, data + offset, sizeof(entries_size));
+    offset += sizeof(entries_size);
+
+    entries.clear();
+    entries.reserve(entries_size);
+
+    //load entries
+    for(int i = 0; i <entries_size; ++i){
+        Entry entry;
+
+        int serialized_size = entry.deserialize(data + offset);
+
+        offset += serialized_size;
+        entries.push_back(entry);
+    }
+
+    // load keys sizw
+    int keys_size = 0;
+
+    memcpy(&keys_size, data + offset, sizeof(keys_size));
+    offset += sizeof(keys_size);
+
+    keys.clear();
+    keys.reserve(keys_size);
+
+    //load keys
+    for(int i = 0; i<keys_size; ++i){
+        Field key(FieldType::TYPE_INT);
+
+        key.deserialize_field(data + offset);
+
+        offset += key.get_serialized_size();
+        keys.push_back(key);
+    }
+
+    next = nullptr;
+}
+
+
+int 
+main(){
+
+    const string file_name = "B+Tree.bin";
+    DiskManager* dm = new DiskManager(file_name);
+    BufferPoolManager* BPM = new BufferPoolManager(dm);
+
+    BPLusTree tree(BPM,2);
+
+    tree.insert(Field(FieldType::TYPE_INT, 19), RID(1, 0));
+    tree.insert(Field(FieldType::TYPE_INT, 5),  RID(1, 1));
+    tree.insert(Field(FieldType::TYPE_INT, 30), RID(1, 2));
+    tree.insert(Field(FieldType::TYPE_INT, 10), RID(1, 3));
+    tree.insert(Field(FieldType::TYPE_INT, 25), RID(1, 4));
+    tree.insert(Field(FieldType::TYPE_INT, 40), RID(1, 5));
+
+    tree.printTree();
+    cout<<"---------------------"<<endl;
+    tree.printLeaves();
+    
 }

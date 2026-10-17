@@ -36,16 +36,19 @@ public:
     Field(FieldType field_type);
 
     //getters :
-    FieldType get_field_type();
+    FieldType get_field_type()const;
     int get_field_size();
 
-    int get_value_int();
-    double get_value_double();
-    bool get_value_bool();
-    string get_value_string();
+    int get_value_int()const;
+    double get_value_double()const;
+    bool get_value_bool()const;
+    string get_value_string()const;
 
     void print_field();
     void serialize_field(char* buffer);
     void deserialize_field(char* buffer);
     int get_serialized_size();
+
+    bool operator<(const Field& other)const;
+    bool operator>(const Field& other)const;
 };

@@ -12,5 +12,10 @@ public:
 
     int get_page_id();
     int get_slot_num();
+
+    void serialize(char* data);
+    void deserialize(char* data);
+    int getSerializedSize();
+    
     void print();  
 };

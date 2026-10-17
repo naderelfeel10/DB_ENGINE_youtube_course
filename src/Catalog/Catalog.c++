@@ -214,7 +214,7 @@ TableInfo* Catalog::get_table(int table_id){
 
     return nullptr;
 }
-
+/*
 int 
 main(){
 
@@ -279,3 +279,4 @@ main(){
     DB_BPM->~BufferPoolManager();
 
 }
+*/

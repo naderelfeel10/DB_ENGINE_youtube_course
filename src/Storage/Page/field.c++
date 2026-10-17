@@ -52,7 +52,7 @@ Field::Field(FieldType field_type){
 }
 
 //getters 
-FieldType Field::get_field_type(){
+FieldType Field::get_field_type()const{
     return this->field_type;
 }
 
@@ -60,20 +60,20 @@ int Field::get_field_size(){
     return this->size;
 }
 
-int Field::get_value_int(){
+int Field::get_value_int()const{
     return this->VALUE_INT;
 }
 
-double Field::get_value_double(){
+double Field::get_value_double()const{
     return this->VALUE_DOUBLE;
 }
 
-bool Field::get_value_bool(){
+bool Field::get_value_bool()const{
     return this->VALUE_BOOL;
 }
 
 
-string Field::get_value_string(){
+string Field::get_value_string()const{
     string str = string(this->VALUE_STRING);
     return str;
 }
@@ -220,6 +220,71 @@ int Field::get_serialized_size(){
 
 }
 
+
+
+bool Field::operator<(const Field& other)const{
+
+    if(this == &other) return false;
+    if(this->field_type != other.get_field_type()) return false;
+
+    //check for nulls
+    if(this->is_null || other.is_null){
+        throw runtime_error("null fields can't be compared");
+    }
+
+    switch(other.field_type){
+        case FieldType::TYPE_INT:{
+            return (this->get_value_int() < other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_DOUBLE:{
+            return (this->get_value_double() < other.get_value_double());
+            break;
+        }
+        case FieldType::TYPE_BOOL:{
+            return (this->get_value_int() < other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_STRING:{
+            return (string(this->get_value_string()) < string(other.get_value_string()));
+            break;
+        }
+        default:
+        return false;
+    }
+}
+
+bool Field::operator>(const Field& other)const{
+
+    if(this == &other) return false;
+    if(this->field_type != other.get_field_type()) return false;
+
+    //check for nulls
+    if(this->is_null || other.is_null){
+        throw runtime_error("null fields can't be compared");
+    }
+
+    switch(other.field_type){
+        case FieldType::TYPE_INT:{
+            return (this->get_value_int() > other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_DOUBLE:{
+            return (this->get_value_double() > other.get_value_double());
+            break;
+        }
+        case FieldType::TYPE_BOOL:{
+            return (this->get_value_int() > other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_STRING:{
+            return (string(this->get_value_string()) > string(other.get_value_string()));
+            break;
+        }
+        default:
+        return false;
+    }
+}
 /*
 int
 main(){
