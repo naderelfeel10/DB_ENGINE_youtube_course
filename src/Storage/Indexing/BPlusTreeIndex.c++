@@ -13,8 +13,9 @@ void BPLusTree::insert(Field key, RID value){
 
         //create page for this new node
         root->page_id = BPM->newPage();
+        cout<<"root page_id : "<<root->page_id<<endl;
 
-        Entry entry = Entry(key, value);
+        Entry entry = Entry(key, value);    
         root->entries.push_back(entry);
         root->keys.push_back(key);
 
@@ -33,7 +34,7 @@ void BPLusTree::insert(Field key, RID value){
 
             //create page for this new node
             new_root->page_id = BPM->newPage();
-        
+            
             new_root->children.push_back(root);
             new_root->childern_pages_ids.push_back(root->page_id);
 
@@ -162,6 +163,9 @@ void BPLusTree::insertNonFull(BPlusNode* root, Field key, RID value){
         }
         i++;
 
+        
+        root->children[i] = loadNode(root->childern_pages_ids[i]);
+
         BPlusNode* child = root->children[i];
         int size = child->is_leaf ? child->entries.size() : child->keys.size();
 
@@ -198,14 +202,16 @@ void BPLusTree::printTree(){
 
     while (!current_level.empty())
     {
-        cout << "Level "
-             << level
-             << ": ";
+        cout << "Level " << level << ": ";
 
         vector<BPlusNode*> next_level;
 
         for (BPlusNode* node : current_level)
         {
+            if (node == nullptr) {
+                continue;
+            }
+
             cout << "[";
 
             for (size_t i = 0;
@@ -214,8 +220,7 @@ void BPLusTree::printTree(){
             {
                 node->keys[i].print_field();
 
-                if (i + 1 < node->keys.size())
-                {
+                if (i + 1 < node->keys.size()) {
                     cout << " | ";
                 }
             }
@@ -224,9 +229,13 @@ void BPLusTree::printTree(){
 
             if (!node->is_leaf)
             {
+                loadChildren(node);
+
                 for (BPlusNode* child : node->children)
                 {
-                    next_level.push_back(child);
+                    if (child != nullptr) {
+                        next_level.push_back(child);
+                    }
                 }
             }
         }
@@ -238,9 +247,24 @@ void BPLusTree::printTree(){
     }
 }
 
-void BPLusTree::printLeaves(){
-    if (root == nullptr)
+
+BPlusNode* BPLusTree::getNextLeaf(BPlusNode* node)
+{
+    if (node == nullptr) {
+        return nullptr;
+    }
+
+    if (node->next == nullptr &&
+        node->next_page_id != -1)
     {
+        node->next = loadNode(node->next_page_id);
+    }
+
+    return node->next;
+}
+void BPLusTree::printLeaves()
+{
+    if (root == nullptr) {
         cout << "Leaf chain is empty\n";
         return;
     }
@@ -254,33 +278,36 @@ void BPLusTree::printLeaves(){
 
     cout << "Leaf chain:\n";
 
-    while (node != nullptr)
+    int steps = 0;
+
+    while (node != nullptr && steps < 20)
     {
-        cout << "[";
+        cout << "[page_id=" << node->page_id
+             << ", next_page_id=" << node->next_page_id
+             << "] ";
 
-        for (size_t i = 0;
-             i < node->entries.size();
-             ++i)
-        {
-            node->entries[i].key.print_field();
-
-            if (i + 1 < node->entries.size())
-            {
-                cout << " | ";
-            }
+        for (auto& entry : node->entries) {
+            entry.key.print_field();
         }
 
-        cout << "]";
+        cout << "\n";
 
-        if (node->next != nullptr)
-        {
-            cout << " -> ";
+        if (node->next_page_id == -1) {
+            break;
         }
 
-        node = node->next;
+        if (node->next_page_id == node->page_id) {
+            cout << "ERROR: leaf points to itself\n";
+            break;
+        }
+
+        node = loadNode(node->next_page_id);
+        ++steps;
     }
 
-    cout << "\n";
+    if (steps == 20) {
+        cout << "ERROR: possible cycle in leaf chain\n";
+    }
 }
 
 
@@ -441,25 +468,78 @@ void BPlusNode::deserialize(char* data){
     next = nullptr;
 }
 
+BPlusNode* BPLusTree::loadNode(int page_id){
+
+    char* page_buffer = BPM->fetchPage(page_id);
+
+    if (page_buffer == nullptr) {
+        return nullptr;
+    }
+
+    BPlusNode* node = new BPlusNode(true);
+
+    node->page_id = page_id;
+    node->deserialize(page_buffer);
+
+    return node;
+}
+
+void BPLusTree::loadChildren(BPlusNode* node){
+
+    if(node == nullptr || node->is_leaf){
+        return;
+    }
+
+    if(node->children.size() != node->childern_pages_ids.size()){
+        node->children.resize(node->childern_pages_ids.size(), nullptr);
+    }
+
+    for (size_t i = 0; i < node->childern_pages_ids.size(); ++i){
+        if (node->children[i] == nullptr){
+            node->children[i] = loadNode(node->childern_pages_ids[i]);
+        }
+    }
+}
 
 int 
 main(){
 
-    const string file_name = "B+Tree.bin";
-    DiskManager* dm = new DiskManager(file_name);
-    BufferPoolManager* BPM = new BufferPoolManager(dm);
+    /*{
+        const string file_name = "B+Tree.bin";
+        DiskManager* dm = new DiskManager(file_name);
+        BufferPoolManager* BPM = new BufferPoolManager(dm);
 
-    BPLusTree tree(BPM,2);
+        BPLusTree tree(BPM,2, -1);
 
-    tree.insert(Field(FieldType::TYPE_INT, 19), RID(1, 0));
-    tree.insert(Field(FieldType::TYPE_INT, 5),  RID(1, 1));
-    tree.insert(Field(FieldType::TYPE_INT, 30), RID(1, 2));
-    tree.insert(Field(FieldType::TYPE_INT, 10), RID(1, 3));
-    tree.insert(Field(FieldType::TYPE_INT, 25), RID(1, 4));
-    tree.insert(Field(FieldType::TYPE_INT, 40), RID(1, 5));
+        tree.insert(Field(FieldType::TYPE_INT, 19), RID(1, 0));
+        tree.insert(Field(FieldType::TYPE_INT, 5),  RID(1, 1));
+        tree.insert(Field(FieldType::TYPE_INT, 30), RID(1, 2));
+        tree.insert(Field(FieldType::TYPE_INT, 10), RID(1, 3));
+        tree.insert(Field(FieldType::TYPE_INT, 25), RID(1, 4));
+        tree.insert(Field(FieldType::TYPE_INT, 40), RID(1, 5));
 
-    tree.printTree();
-    cout<<"---------------------"<<endl;
-    tree.printLeaves();
+        tree.printTree();
+        cout<<"---------------------"<<endl;
+        tree.printLeaves();
+        
+        cout<<"tree page_id : "<<tree.root->page_id<<endl;
+        BPM->~BufferPoolManager();
+
+    }*/
+
     
-}
+    {
+        const string file_name = "B+Tree.bin";
+        DiskManager* dm = new DiskManager(file_name);
+        BufferPoolManager* BPM = new BufferPoolManager(dm);
+
+        int root_page_id = 2;
+        int t = 3;
+        BPLusTree tree = BPLusTree(BPM, t, root_page_id);
+
+        tree.printTree();
+        cout<<"---------------------"<<endl;
+        tree.printLeaves();
+    }
+    
+}   

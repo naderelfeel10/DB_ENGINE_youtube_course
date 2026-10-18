@@ -44,13 +44,16 @@ struct BPlusNode{
     void deserialize(char* data);
 
 
-    BPlusNode(bool is_leaf):is_leaf(is_leaf){};
+    BPlusNode(bool leaf):is_leaf(leaf), next(nullptr), page_id(-1), next_page_id(-1){}
+
 };
 
 
 class BPLusTree{
 
-private:
+//private:
+public:
+    
     //root node 
     BPlusNode* root;
     //min degree
@@ -59,10 +62,19 @@ private:
 
     void splitChild(BPlusNode* parent, int index ,BPlusNode* child);
     void insertNonFull(BPlusNode* root, Field key, RID value);
+    BPlusNode* loadNode(int page_id);
+    void loadChildren(BPlusNode* node);
+    
+    BPlusNode* getNextLeaf(BPlusNode* node);
 
-public:
-    BPLusTree(BufferPoolManager*BPM, int t):BPM(BPM), t(t), root(nullptr){};
 
+    BPLusTree(BufferPoolManager*BPM, int t, int root_page_id):BPM(BPM), t(t), root(nullptr){
+        
+        if(root_page_id != -1){
+            root = loadNode(root_page_id);
+        }
+    };
+    
     //functions:
     void insert(Field key, RID value);
     void printTree();
