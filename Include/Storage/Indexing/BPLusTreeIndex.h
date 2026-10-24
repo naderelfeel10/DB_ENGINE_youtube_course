@@ -62,9 +62,9 @@ public:
 
     void splitChild(BPlusNode* parent, int index ,BPlusNode* child);
     void insertNonFull(BPlusNode* root, Field key, RID value);
+
     BPlusNode* loadNode(int page_id);
     void loadChildren(BPlusNode* node);
-    
     BPlusNode* getNextLeaf(BPlusNode* node);
 
 
@@ -74,11 +74,11 @@ public:
             root = loadNode(root_page_id);
         }
     };
-    
-    //functions:
-    void insert(Field key, RID value);
     void printTree();
     void printLeaves();
-    //void search(Field key);
 
+    //functions:
+    void insert(Field key, RID value);
+    vector<RID> search(Field key);
+    
 };

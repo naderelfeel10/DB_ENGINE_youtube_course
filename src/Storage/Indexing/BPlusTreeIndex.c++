@@ -501,6 +501,8 @@ void BPLusTree::loadChildren(BPlusNode* node){
     }
 }
 
+
+
 int 
 main(){
 
@@ -522,24 +524,22 @@ main(){
         cout<<"---------------------"<<endl;
         tree.printLeaves();
         
-        cout<<"tree page_id : "<<tree.root->page_id<<endl;
         BPM->~BufferPoolManager();
 
     }*/
-
-    
     {
         const string file_name = "B+Tree.bin";
         DiskManager* dm = new DiskManager(file_name);
         BufferPoolManager* BPM = new BufferPoolManager(dm);
 
-        int root_page_id = 2;
-        int t = 3;
-        BPLusTree tree = BPLusTree(BPM, t, root_page_id);
 
+        BPLusTree tree(BPM,2, 2);
+    
+    
         tree.printTree();
         cout<<"---------------------"<<endl;
         tree.printLeaves();
+    
     }
     
 }   
