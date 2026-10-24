@@ -50,5 +50,11 @@ public:
     int get_serialized_size();
 
     bool operator<(const Field& other)const;
+    bool operator<=(const Field& other)const;
     bool operator>(const Field& other)const;
+    bool operator>=(const Field& other)const;
+
+    bool operator==(const Field& other)const;
+
+
 };

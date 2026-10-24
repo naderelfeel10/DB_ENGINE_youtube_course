@@ -16,4 +16,6 @@ public:
     TableIterator& operator++();
     Tuple operator*();
     bool end();
+
+    RID get_curr_rid(){return this->curr_rid;}
 };

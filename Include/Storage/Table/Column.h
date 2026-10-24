@@ -16,7 +16,8 @@ public:
     
     FieldType get_field_type(){
         return this->field_type;
-    }
+    }   
+    string get_col_name(){return col_name;}
 
     int serialize_col(char* buffer);
     int deserialize_col(const char* buffer);

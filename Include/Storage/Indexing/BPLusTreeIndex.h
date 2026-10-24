@@ -79,6 +79,6 @@ public:
 
     //functions:
     void insert(Field key, RID value);
-    vector<RID> search(Field key);
-    
+    vector<RID> search(Field& key);    
+    vector<RID> searchRange(Field& lower_key, Field& upper_key);
 };

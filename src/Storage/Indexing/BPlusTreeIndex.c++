@@ -502,31 +502,178 @@ void BPLusTree::loadChildren(BPlusNode* node){
 }
 
 
+//searching in B+ tree index : 
+vector<RID> BPLusTree::search(Field& key){
+
+    //result would be a vector of RIDs:
+    vector<RID> result;
+
+    //return empty vec if the tree in empty 
+    if(root == nullptr){
+        return result;
+    }
+
+    //start traversing from the root node 
+    BPlusNode* curr = root;
+
+    while(curr->is_leaf == false){
+        int i = 0;
+        //find the correct child in curr node : 
+        //if key>=separator, then move the pointer to the child on the right 
+        while(i < curr->keys.size() && key >= curr->keys[i]){
+            //move to the next child to the right
+            i++;
+        }
+
+        //internal childs should have one more child than keys
+        if(i >= curr->childern_pages_ids.size()){
+            return result;
+        }
+
+        //we lazy load the children when needed : 
+        curr->children.resize(curr->childern_pages_ids.size(), nullptr);
+
+        if(curr->children[i] == nullptr){
+
+            curr->children[i] = loadNode(curr->childern_pages_ids[i]);
+
+            //stop if the page could not be loaded.
+            if(curr->children[i]== nullptr){
+                return result;
+            }
+        }
+
+        //now after loading all children to the mem
+        curr = curr->children[i];
+    }
+    
+    
+    //finishing the prev loop means we are in the leaf node :
+    //loop over the entries till we find the key that matches : 
+    
+    while(curr != nullptr){
+
+        for(const Entry& entry : curr->entries){
+            //if the key is found, push it to the result
+            if(entry.key == key){  
+                result.push_back(entry.value);
+            }
+            //if it's greater than the key, then stop 
+            else if(entry.key>key){
+                return result;
+            }
+        }
+
+        //the key might be in the next leaf as well 
+        if(curr->next_page_id == -1){
+            break;
+        }
+        //else then load the next leaf
+        curr = loadNode(curr->next_page_id);
+    }
+
+    return result;
+}
+
+
+//searching in B+ tree index : 
+vector<RID> BPLusTree::searchRange(Field& lower_key, Field& upper_key){
+
+    //result would be a vector of RIDs:
+    vector<RID> result;
+
+    //return empty vec if the tree in empty 
+    if(root == nullptr){
+        return result;
+    }
+
+    //start traversing from the root node 
+    BPlusNode* curr = root;
+
+    while(curr->is_leaf == false){
+        int i = 0;
+        //find the correct child in curr node : 
+        //if key>=separator, then move the pointer to the child on the right 
+        while(i < curr->keys.size() && lower_key >= curr->keys[i]){
+            //move to the next child to the right
+            i++;
+        }
+
+        //internal childs should have one more child than keys
+        if(i >= curr->childern_pages_ids.size()){
+            return result;
+        }
+
+        //we lazy load the children when needed : 
+        curr->children.resize(curr->childern_pages_ids.size(), nullptr);
+
+        if(curr->children[i] == nullptr){
+
+            curr->children[i] = loadNode(curr->childern_pages_ids[i]);
+
+            //stop if the page could not be loaded.
+            if(curr->children[i]== nullptr){
+                return result;
+            }
+        }
+
+        //now after loading all children to the mem
+        curr = curr->children[i];
+    }
+    
+    
+    //finishing the prev loop means we are in the leaf node :
+    //loop over the entries till we find the key that matches : 
+    
+    while(curr != nullptr){
+
+        for(const Entry& entry : curr->entries){
+            //if it's greater than the key, then stop 
+            if(entry.key>upper_key){
+                return result;
+            }
+
+            if (entry.key >= lower_key) {
+                result.push_back(entry.value);
+            }
+        }
+
+        //the key might be in the next leaf as well 
+        if(curr->next_page_id == -1){
+            break;
+        }
+        //else then load the next leaf
+        curr = loadNode(curr->next_page_id);
+    }
+
+    return result;
+}
 
 int 
 main(){
 
-    /*{
-        const string file_name = "B+Tree.bin";
-        DiskManager* dm = new DiskManager(file_name);
-        BufferPoolManager* BPM = new BufferPoolManager(dm);
+    // {
+    //     const string file_name = "B+Tree.bin";
+    //     DiskManager* dm = new DiskManager(file_name);
+    //     BufferPoolManager* BPM = new BufferPoolManager(dm);
 
-        BPLusTree tree(BPM,2, -1);
+    //     BPLusTree tree(BPM,2, -1);
 
-        tree.insert(Field(FieldType::TYPE_INT, 19), RID(1, 0));
-        tree.insert(Field(FieldType::TYPE_INT, 5),  RID(1, 1));
-        tree.insert(Field(FieldType::TYPE_INT, 30), RID(1, 2));
-        tree.insert(Field(FieldType::TYPE_INT, 10), RID(1, 3));
-        tree.insert(Field(FieldType::TYPE_INT, 25), RID(1, 4));
-        tree.insert(Field(FieldType::TYPE_INT, 40), RID(1, 5));
+    //     tree.insert(Field(FieldType::TYPE_INT, 19), RID(1, 0));
+    //     tree.insert(Field(FieldType::TYPE_INT, 5),  RID(1, 1));
+    //     tree.insert(Field(FieldType::TYPE_INT, 30), RID(1, 2));
+    //     tree.insert(Field(FieldType::TYPE_INT, 10), RID(1, 3));
+    //     tree.insert(Field(FieldType::TYPE_INT, 25), RID(1, 4));
+    //     tree.insert(Field(FieldType::TYPE_INT, 40), RID(1, 5));
 
-        tree.printTree();
-        cout<<"---------------------"<<endl;
-        tree.printLeaves();
+    //     tree.printTree();
+    //     cout<<"---------------------"<<endl;
+    //     tree.printLeaves();
         
-        BPM->~BufferPoolManager();
+    //     BPM->~BufferPoolManager();
 
-    }*/
+    // }
+
     {
         const string file_name = "B+Tree.bin";
         DiskManager* dm = new DiskManager(file_name);
@@ -540,6 +687,22 @@ main(){
         cout<<"---------------------"<<endl;
         tree.printLeaves();
     
+        Field f = Field(FieldType::TYPE_INT, 30);
+        vector<RID> res =  tree.search(f);
+
+        for(auto& rid:res){
+            rid.print();
+        }
+
+        Field f1 = Field(FieldType::TYPE_INT, 5);
+        Field f2 = Field(FieldType::TYPE_INT, 25);
+
+        vector<RID> res_range =  tree.searchRange(f1,f2);
+
+        for(auto& rid:res_range){
+            rid.print();
+        }
     }
+    
     
 }   

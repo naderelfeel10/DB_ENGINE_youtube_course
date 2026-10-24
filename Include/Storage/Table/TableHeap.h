@@ -3,11 +3,13 @@
 
 #include<string>
 #include<vector>
+#include<map>
 #include"Column.h"
 #include"RID.h"
 
 #include"Buffer/BufferPoolManager.h"
-
+#include"Indexing/BPLusTreeIndex.h"
+#include"TableIterator.c++"
 using namespace std;
 
 class TableHeap{
@@ -27,6 +29,9 @@ private:
     RID starting_rid;
     RID stopping_rid;
 
+    //col_name : index
+    map<string, BPLusTree*>B_plus_indexes;
+
 public:
     TableHeap(BufferPoolManager* BPM, vector<Column> schema, string table_name, int table_id);
     BufferPoolManager* BPM;
@@ -35,8 +40,10 @@ public:
     RID insert_tuple(Tuple tuple);
     Tuple* get_tuple(RID rid);
     RID update_tuple(RID rid, Tuple new_tuple);
-
     bool delete_tuple(RID rid);
+
+    void addIndex(BPLusTree* index, string col_name);
+    void fill_index(string col_name);
 
     bool check_schema(Tuple tuple);
     RID get_last_rid(){
@@ -49,4 +56,6 @@ public:
     int get_lst_page_id(){
         return this->last_page_id;
     }
+
+    BPLusTree* get_index(string col_name);
 };

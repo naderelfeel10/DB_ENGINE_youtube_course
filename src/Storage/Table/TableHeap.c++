@@ -153,6 +153,33 @@ bool TableHeap::delete_tuple(RID rid){
     return is_deleted;
 }
 
+
+void TableHeap::addIndex(BPLusTree* index, string col_name){
+    this->B_plus_indexes[col_name] = index;
+    fill_index(col_name);
+}
+
+void TableHeap::fill_index(string col_name){
+
+    BPLusTree* index = B_plus_indexes[col_name];
+
+    TableIterator it = TableIterator(this, starting_rid, stopping_rid);
+
+    int col_index = 0;
+    for(auto& c : schema){
+        if(col_name == c.get_col_name()){
+            break;
+        }
+        col_index++;
+    }
+    for(; !it.end();++it){
+        Tuple t = *it;
+        Field key = t.get_fields()[col_index];
+        RID rid = it.get_curr_rid();
+
+        index->insert(key, rid);
+    }
+}
 /*
 int 
 main(){

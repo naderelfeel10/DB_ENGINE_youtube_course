@@ -254,6 +254,71 @@ bool Field::operator<(const Field& other)const{
     }
 }
 
+
+bool Field::operator<=(const Field& other)const{
+
+    if(this == &other) return false;
+    if(this->field_type != other.get_field_type()) return false;
+
+    //check for nulls
+    if(this->is_null || other.is_null){
+        throw runtime_error("null fields can't be compared");
+    }
+
+    switch(other.field_type){
+        case FieldType::TYPE_INT:{
+            return (this->get_value_int() <= other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_DOUBLE:{
+            return (this->get_value_double() <= other.get_value_double());
+            break;
+        }
+        case FieldType::TYPE_BOOL:{
+            return (this->get_value_int() <= other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_STRING:{
+            return (string(this->get_value_string()) <= string(other.get_value_string()));
+            break;
+        }
+        default:
+        return false;
+    }
+}
+
+bool Field::operator==(const Field& other)const{
+
+    if(this == &other) return false;
+    if(this->field_type != other.get_field_type()) return false;
+
+    //check for nulls
+    if(this->is_null || other.is_null){
+        throw runtime_error("null fields can't be compared");
+    }
+
+    switch(other.field_type){
+        case FieldType::TYPE_INT:{
+            return (this->get_value_int() == other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_DOUBLE:{
+            return (this->get_value_double() == other.get_value_double());
+            break;
+        }
+        case FieldType::TYPE_BOOL:{
+            return (this->get_value_int() == other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_STRING:{
+            return (string(this->get_value_string()) == string(other.get_value_string()));
+            break;
+        }
+        default:
+        return false;
+    }
+}
+
 bool Field::operator>(const Field& other)const{
 
     if(this == &other) return false;
@@ -279,6 +344,38 @@ bool Field::operator>(const Field& other)const{
         }
         case FieldType::TYPE_STRING:{
             return (string(this->get_value_string()) > string(other.get_value_string()));
+            break;
+        }
+        default:
+        return false;
+    }
+}
+
+bool Field::operator>=(const Field& other)const{
+
+    if(this == &other) return false;
+    if(this->field_type != other.get_field_type()) return false;
+
+    //check for nulls
+    if(this->is_null || other.is_null){
+        throw runtime_error("null fields can't be compared");
+    }
+
+    switch(other.field_type){
+        case FieldType::TYPE_INT:{
+            return (this->get_value_int() >= other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_DOUBLE:{
+            return (this->get_value_double() >= other.get_value_double());
+            break;
+        }
+        case FieldType::TYPE_BOOL:{
+            return (this->get_value_int() >= other.get_value_int());
+            break;
+        }
+        case FieldType::TYPE_STRING:{
+            return (string(this->get_value_string()) >= string(other.get_value_string()));
             break;
         }
         default:
