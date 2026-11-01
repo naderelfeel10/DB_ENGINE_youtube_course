@@ -1,0 +1,60 @@
+# Build output
+build/
+cmake-build-*/
+bin/
+obj/
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.dylib
+*.out
+*.exe
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+compile_commands.json
+install_manifest.txt
+
+# Database files generated while running ElfeelDB
+*.db
+*.bin
+*.dat
+*.idx
+*.wal
+catalog.db
+DB.bin
+B+Tree.bin
+wal.bin
+
+# Logs and runtime files
+*.log
+*.tmp
+*.swp
+*.swo
+core
+core.*
+
+# Test and coverage output
+Testing/
+coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# IDE and editor files
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.sln
+*.vcxproj*
+
+# OS files
+.DS_Store
+Thumbs.db

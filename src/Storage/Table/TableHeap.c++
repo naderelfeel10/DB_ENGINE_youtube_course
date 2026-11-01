@@ -88,6 +88,20 @@ RID TableHeap::insert_tuple(Tuple tuple){
 
     stopping_rid = RID(last_page_id, slot_num);
 
+    //insert into indexes
+    for(auto&[col_name,index]:this->pplusindexes){
+
+        int col_index{0};
+        for(auto& c:schema){
+            if(col_name == c.get_col_name()){
+                break;
+            }
+            col_index++;
+        }
+        Field key = tuple.get_fields()[col_index];
+        index->insert(key,stopping_rid);
+    }
+
     return stopping_rid;
 }
 
@@ -150,35 +164,58 @@ bool TableHeap::delete_tuple(RID rid){
     bool is_deleted =  page->delete_tuple(slot_num);
 
     this->num_of_tuples--;
+
+    //insert into indexes
+    for(auto&[col_name,index]:this->pplusindexes){
+
+        int col_index{0};
+        for(auto& c:schema){
+            if(col_name == c.get_col_name()){
+                break;
+            }
+            col_index++;
+        }
+        Field key = tuple.get_fields()[col_index];
+        index->delete(key,stopping_rid);
+    }
+
     return is_deleted;
 }
 
-
 void TableHeap::addIndex(BPLusTree* index, string col_name){
-    this->B_plus_indexes[col_name] = index;
+
+    //add it to the map
+    this->pplusindexes[col_name] = index;
+    //fill the index
     fill_index(col_name);
 }
 
-void TableHeap::fill_index(string col_name){
+BPLusTree* TableHeap::getIndex(string col_name){
+    return pplusindexes[col_name];
+}
 
-    BPLusTree* index = B_plus_indexes[col_name];
+void TableHeap::fill_index(string col_name){
+    //fetch the index first 
+    BPLusTree* index  = this->getIndex(col_name);
 
     TableIterator it = TableIterator(this, starting_rid, stopping_rid);
 
-    int col_index = 0;
-    for(auto& c : schema){
+    int col_index{0};
+    for(auto& c:schema){
         if(col_name == c.get_col_name()){
             break;
         }
         col_index++;
     }
+
     for(; !it.end();++it){
-        Tuple t = *it;
+        Tuple t = *it;  
+
         Field key = t.get_fields()[col_index];
         RID rid = it.get_curr_rid();
-
         index->insert(key, rid);
     }
+
 }
 /*
 int 

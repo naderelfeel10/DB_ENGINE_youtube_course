@@ -30,7 +30,7 @@ private:
     RID stopping_rid;
 
     //col_name : index
-    map<string, BPLusTree*>B_plus_indexes;
+    map<string, BPLusTree*>pplusindexes;
 
 public:
     TableHeap(BufferPoolManager* BPM, vector<Column> schema, string table_name, int table_id);
@@ -43,6 +43,7 @@ public:
     bool delete_tuple(RID rid);
 
     void addIndex(BPLusTree* index, string col_name);
+    BPLusTree* getIndex(string col_name);
     void fill_index(string col_name);
 
     bool check_schema(Tuple tuple);
@@ -57,5 +58,4 @@ public:
         return this->last_page_id;
     }
 
-    BPLusTree* get_index(string col_name);
 };

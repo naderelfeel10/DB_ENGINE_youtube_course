@@ -25,8 +25,8 @@ struct Entry{
 
     Entry(): key(Field(FieldType::TYPE_INT)), value(RID(-1,-1)){};
     Entry(Field key, RID rid):key(key), value(rid){};
-
 };
+
 struct BPlusNode{
 
     bool is_leaf;
@@ -80,5 +80,6 @@ public:
     //functions:
     void insert(Field key, RID value);
     vector<RID> search(Field& key);    
-    vector<RID> searchRange(Field& lower_key, Field& upper_key);
+    vector<RID> searchRange(Field& lower_key, Field& upper_key);    
+
 };
