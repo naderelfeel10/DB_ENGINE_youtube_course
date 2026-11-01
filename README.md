@@ -1,3 +1,6 @@
+
+## youtube playlist : https://www.youtube.com/playlist?list=PLfHhEMIVYaNs
+
 # ElfeelDB
 
 ElfeelDB is a disk-based relational database engine built from scratch in modern C++17.
