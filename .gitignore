@@ -11,6 +11,8 @@ obj/
 *.dylib
 *.out
 *.exe
+*.bin
+
 
 # CMake generated files
 CMakeCache.txt
@@ -46,7 +48,8 @@ coverage/
 *.gcda
 *.gcno
 *.gcov
-
+AGENTS.md
+PROJECT_CONTEXT.md
 # IDE and editor files
 .vscode/
 .idea/

@@ -1,4 +1,8 @@
 #include"Storage/Indexing/BPLusTreeIndex.h"
+#include <cstdlib>
+#include <filesystem>
+#include <stdexcept>
+
 
 
 
@@ -119,6 +123,11 @@ void BPLusTree::splitChild(BPlusNode* parent, int index, BPlusNode* child){
             child->children.begin() + t,
             child->children.end()
         );
+        
+        // move page ids with the children so we can load them later
+        new_child->childern_pages_ids.assign( child->childern_pages_ids.begin() + t, child->childern_pages_ids.end());
+        
+        child->childern_pages_ids.erase( child->childern_pages_ids.begin() + t,child->childern_pages_ids.end());
     }
 
     parent->children.insert(parent->children.begin() + index + 1, new_child);
@@ -185,6 +194,61 @@ void BPLusTree::insertNonFull(BPlusNode* root, Field key, RID value){
     char* page_buffer = BPM->fetchPage(root->page_id);
     root->serialize(page_buffer);
     BPM->mark_as_dirty(root->page_id);
+}
+
+//remove one mathcing entry while keeping the existing tree pages
+bool BPLusTree::remove(Field key, RID value){
+
+    if(root == nullptr){
+        return false;
+    }
+
+    BPlusNode* node = root;
+    
+    //start at the leftmost child that could contain the key
+    while(!node->is_leaf){
+
+        size_t index = 0;
+        while(index< node->keys.size() && node->keys[index] < key){
+            ++index;
+        }
+
+        node = loadNode(node->childern_pages_ids[index]);
+        if(node== nullptr){
+            return false;
+        }
+
+    }
+
+    // duplicate keys can be spread across sevral leaf pages
+    while(node != nullptr){
+        
+        for(auto it = node->entries.begin(); it != node->entries.end(); ++it){
+            
+            if(it->key > key){
+                return false;
+            }
+
+            if(it->key == key&&it->value.get_page_id() == value.get_page_id() &&
+               it->value.get_slot_num() == value.get_slot_num()){
+                
+                node->entries.erase(it);
+                // keep the leaf keys in sync with the remaining entries
+                node->keys.clear();
+                for(const auto& entry : node->entries){
+                    node->keys.push_back(entry.key);
+                }
+                char* page_buffer = BPM->fetchPage(node->page_id);
+                node->serialize(page_buffer);
+
+                // mark the page dirty so the change can be saved
+                BPM->mark_as_dirty(node->page_id);
+                return true;
+            }
+        }
+        node = node->next_page_id == -1 ? nullptr : loadNode(node->next_page_id);
+    }
+    return false;
 }
 
 void BPLusTree::printTree(){
@@ -521,8 +585,9 @@ vector<RID> BPLusTree::search(Field& key){
 
         int i{};
         //find the correct child 
-        while(i < curr->keys.size() && key >= curr->keys[i]){
-            //moves the pointer to the next (greater) key 
+
+        // equal keys may be in both children, so start on the left
+        while(i < curr->keys.size() && key > curr->keys[i]){
             i++;
         }
 
@@ -535,7 +600,7 @@ vector<RID> BPLusTree::search(Field& key){
         curr->children.resize(curr->childern_pages_ids.size(), nullptr);
 
         //load it 
-        if(curr->children[i] == nullptr){
+        {
             
             int page_id  = curr->childern_pages_ids[i];
             curr->children[i] = loadNode(page_id);
@@ -598,8 +663,7 @@ vector<RID> BPLusTree::searchRange(Field& lower_key, Field& upper_key){
 
         int i{};
         //find the correct child 
-        while(i < curr->keys.size() && lower_key >= curr->keys[i]){
-            //moves the pointer to the next (greater) key 
+        while(i < curr->keys.size() && lower_key > curr->keys[i]){
             i++;
         }
 
@@ -612,7 +676,7 @@ vector<RID> BPLusTree::searchRange(Field& lower_key, Field& upper_key){
         curr->children.resize(curr->childern_pages_ids.size(), nullptr);
 
         //load it 
-        if(curr->children[i] == nullptr){
+        {
             
             int page_id  = curr->childern_pages_ids[i];
             curr->children[i] = loadNode(page_id);
@@ -655,61 +719,90 @@ vector<RID> BPLusTree::searchRange(Field& lower_key, Field& upper_key){
 
     return result;
 }
+/*
+int main(){
 
-int 
-main(){
+    // use a fresh folder for every run so the tests do not touch existing data
+    char directory[] = "/tmp/bplus_tree_test_XXXXXX";
 
-    // {
-    //     const string file_name = "B+Tree.bin";
-    //     DiskManager* dm = new DiskManager(file_name);
-    //     BufferPoolManager* BPM = new BufferPoolManager(dm);
-
-    //     BPLusTree tree(BPM,2, -1);
-
-    //     tree.insert(Field(FieldType::TYPE_INT, 19), RID(1, 0));
-    //     tree.insert(Field(FieldType::TYPE_INT, 5),  RID(1, 1));
-    //     tree.insert(Field(FieldType::TYPE_INT, 30), RID(1, 2));
-    //     tree.insert(Field(FieldType::TYPE_INT, 10), RID(1, 3));
-    //     tree.insert(Field(FieldType::TYPE_INT, 25), RID(1, 4));
-    //     tree.insert(Field(FieldType::TYPE_INT, 40), RID(1, 5));
-
-    //     tree.printTree();
-    //     cout<<"---------------------"<<endl;
-    //     tree.printLeaves();
-        
-    //     BPM->~BufferPoolManager();
-
-    // }
-
-    {
-        const string file_name = "B+Tree.bin";
-        DiskManager* dm = new DiskManager(file_name);
-        BufferPoolManager* BPM = new BufferPoolManager(dm);
-
-
-        BPLusTree tree(BPM,2, 2);
-    
-    
-        tree.printTree();
-        cout<<"---------------------"<<endl;
-        tree.printLeaves();
-    
-        Field f1 = Field(FieldType::TYPE_INT, 5);
-        vector<RID> res = tree.search(f1);
-        
-        for(auto& rid:res){
-            rid.print();
-        }
-
-        cout<<"/////////////////////"<<endl;
-
-        Field f2 = Field(FieldType::TYPE_INT, 30);
-        vector<RID> range_res = tree.searchRange(f1,f2);
-        
-        for(auto& rid:range_res){
-            rid.print();
-        }
+    if(mkdtemp(directory) == nullptr){
+        cerr << "could not create a test directory\n";
+        return 1;
     }
-    
-    
-}   
+    string file_name = string(directory) + "/index.bin";
+    int root_page_id = -1;
+
+    //this function is like assertion to test failed and passed cases
+    auto check = [](bool condition, const string& name){
+        if(!condition){
+            throw runtime_error("failed: " + name);
+        }
+        cout<<"passed: "<<name<<endl;
+    };
+
+
+    try {
+
+
+        {
+            DiskManager* disk = new DiskManager(file_name);
+            BufferPoolManager buffer(disk);
+            BPLusTree tree(&buffer, 2, -1);
+            Field key(FieldType::TYPE_INT, 1);
+
+            check(!tree.remove(key, RID(1, 4)), "remove from empty tree");
+
+            // insert duplicate keys across enough pages to split internal nodes
+            for(int i = 0; i < 12; ++i){
+                tree.insert(Field(FieldType::TYPE_INT, i / 3), RID(1, i));
+            }
+
+            check(tree.search(key).size() == 3, "find duplicate keys");
+            check(!tree.remove(key, RID(1, 99)), "remove missing rid");
+            check(tree.remove(key, RID(1, 4)), "remove one duplicate");
+            check(!tree.remove(key, RID(1, 4)), "remove the same entry again");
+
+            vector<RID> remaining = tree.search(key);
+
+            check(remaining.size() == 2, "other duplicates remain");
+
+            for(auto& rid : remaining){
+                check(rid.get_slot_num() != 4, "removed rid is absent");
+            }
+
+            Field upper(FieldType::TYPE_INT, 2);
+            check(tree.searchRange(key, upper).size() == 5, "range after deletion");
+            root_page_id = tree.root->page_id;
+        }
+
+        // reopen the index to check that the deletion was saved
+        //test if saved correctly 
+        {
+            DiskManager* disk = new DiskManager(file_name);
+            BufferPoolManager buffer(disk);
+            BPLusTree tree(&buffer, 2, root_page_id);
+            Field key(FieldType::TYPE_INT, 1);
+
+            check(tree.search(key).size() == 2, "deletion after reopening");
+            check(tree.remove(key, RID(1, 3)), "remove first remaining duplicate");
+            check(tree.remove(key, RID(1, 5)), "remove last remaining duplicate");
+
+            check(tree.search(key).empty(), "all duplicates removed");
+
+            tree.insert(key, RID(2, 1));
+            vector<RID> inserted = tree.search(key);
+
+            check(inserted.size()==1 &&inserted[0].get_page_id()== 2&& inserted[0].get_slot_num() == 1, "insert after deletion");
+        }
+
+    }catch(const exception& error){
+        cerr<<error.what()<<endl;
+        filesystem::remove_all(directory);
+        return 1;
+    }
+
+    filesystem::remove_all(directory);
+    cout << "all b+ tree tests passed\n";
+    return 0;
+}
+*/

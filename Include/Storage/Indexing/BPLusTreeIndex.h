@@ -79,6 +79,10 @@ public:
 
     //functions:
     void insert(Field key, RID value);
+    // ##########
+    // remove one entry with the given key and rid and return wether it was found
+    bool remove(Field key, RID value);
+    // ##########
     vector<RID> search(Field& key);    
     vector<RID> searchRange(Field& lower_key, Field& upper_key);    
 
