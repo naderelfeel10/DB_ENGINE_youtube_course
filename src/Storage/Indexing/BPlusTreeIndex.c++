@@ -9,14 +9,30 @@
 
 void BPLusTree::insert(Field key, RID value){
 
+    // each leaf saves both entries and keys, so reserve room for a full leaf
+    if(t < 2){
+        throw runtime_error("index degree must be at least 2");
+    }
+
+    size_t entry_count = static_cast<size_t>(t) * 2 - 1;
+    size_t entry_size = 2 * static_cast<size_t>(key.get_serialized_size()) + value.getSerializedSize();
+
+    size_t header_size = sizeof(PageHeader) + sizeof(bool) + 4 * sizeof(int);
+
+    if(entry_size > (PAGE_SIZE - header_size) / entry_count){
+        throw runtime_error("index key or degree is too large for a page");
+    }
+
     //if it's the first entry in the tree, then create a new root;
     if(root == nullptr){
 
         //create new node :
+        
+        // allocate first so a failed allocation leaves the tree empty
+        int page_id = BPM->newPage();
         root = new BPlusNode(true);
+        root->page_id = page_id;
 
-        //create page for this new node
-        root->page_id = BPM->newPage();
         cout<<"root page_id : "<<root->page_id<<endl;
 
         Entry entry = Entry(key, value);    
@@ -27,6 +43,11 @@ void BPLusTree::insert(Field key, RID value){
         char* page_buffer = BPM->fetchPage(root->page_id);
         root->serialize(page_buffer);
         BPM->mark_as_dirty(root->page_id);
+
+        // tell the catalog where to find the first root
+        if(on_root_change){
+            on_root_change(root->page_id);
+        }
 
     }else{
 
@@ -49,6 +70,11 @@ void BPLusTree::insert(Field key, RID value){
             char* page_buffer = BPM->fetchPage(new_root->page_id);
             new_root->serialize(page_buffer);
             BPM->mark_as_dirty(new_root->page_id);
+            
+            // save the new root page after a split
+            if(on_root_change){
+                on_root_change(new_root->page_id);
+            }
         }
         //insert the new entry : 
         insertNonFull(root, key, value);

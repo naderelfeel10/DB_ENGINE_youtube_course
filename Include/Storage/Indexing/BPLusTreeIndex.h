@@ -7,6 +7,7 @@
 #include"Storage/Table/RID.h"
 #include<iostream>
 #include<algorithm>
+#include <functional>
 #include"Storage/Page/Page.h"
 #include"Buffer/BufferPoolManager.h"
 
@@ -60,6 +61,9 @@ public:
     int t;
     BufferPoolManager* BPM;
 
+    // notify the catalog when a new root page is created
+    function<void(int)> on_root_change;
+
     void splitChild(BPlusNode* parent, int index ,BPlusNode* child);
     void insertNonFull(BPlusNode* root, Field key, RID value);
 
@@ -79,10 +83,8 @@ public:
 
     //functions:
     void insert(Field key, RID value);
-    // ##########
     // remove one entry with the given key and rid and return wether it was found
     bool remove(Field key, RID value);
-    // ##########
     vector<RID> search(Field& key);    
     vector<RID> searchRange(Field& lower_key, Field& upper_key);    
 

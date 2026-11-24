@@ -1,35 +1,44 @@
 #include"Storage/Table/TableIterator.h"
+#include"Storage/Table/TableHeap.h"
 
 
+
+// start at the first live row from the requested position
+TableIterator::TableIterator(TableHeap* table_heap, RID starting_rid, RID stopping_rid)
+    : curr_rid(starting_rid), stopping_rid(stopping_rid), table_heap(table_heap){
+    skip_deleted();
+}
+
+// move through slots and pages until a live row is found
+void TableIterator::skip_deleted(){
+    while(curr_rid.get_page_id() != -1){
+        int page_id = curr_rid.get_page_id();
+        char* data = table_heap->BPM->fetchPage(page_id);
+        PageHeader* header = reinterpret_cast<PageHeader*>(data);
+        int slots_count = header->num_of_tuples + header->num_of_deleted_tuples;
+        int slot = curr_rid.get_slot_num();
+        Slot* slots = reinterpret_cast<Slot*>(data + sizeof(PageHeader));
+        while(slot < slots_count && slots[slot].is_deleted){
+            ++slot;
+        }
+        if(slot < slots_count){
+            curr_rid = RID(page_id, slot);
+            return;
+        }
+        // move to the next page when this one has no more live rows
+        curr_rid = RID(header->next_page_id, 0);
+    }
+}
 
 TableIterator& TableIterator::operator++(){
 
     //whend i call ++, advance the pointer to point the next tuple in the table 
     //fetch page : 
     int page_id = curr_rid.get_page_id();
-    char* page_buffer = this->table_heap->BPM->fetchPage(page_id);
-
-    PageHeader* page_header = reinterpret_cast<PageHeader*>(page_buffer);
-    Page* page = reinterpret_cast<Page*>(page_buffer);
-
-    //prepare the next tuple in the table 
     int next_slot_num = curr_rid.get_slot_num() + 1;
-    int next_page_id = page_header->next_page_id;
-
-    //check if the table is finished 
-    if(next_page_id == -1){
-        curr_rid = RID(-1, -1);
-        return *this;
-    }
-
-    //else 
-    if(next_slot_num >= page_header->num_of_tuples){
-        curr_rid = RID(next_page_id, 0);
-    }
-    else{
-        curr_rid = RID(page_id, next_slot_num);
-    }
-
+    curr_rid = RID(page_id, next_slot_num);
+    
+    skip_deleted();
     return *this;
 
 }

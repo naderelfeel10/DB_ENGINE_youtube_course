@@ -111,6 +111,13 @@ void DiskManager::resizeFile(){
 
 size_t DiskManager::allocate_page(){
 
+    // the disk directory is stored in one page, so check it before allocating
+    size_t metadata_size = 4 * sizeof(int) + file_name.size() + (pages_dir.size() + 1) * sizeof(DirEntry) + deleted_pages.size() * sizeof(size_t);
+    
+    if(metadata_size > PAGE_SIZE){
+        throw runtime_error("disk page directory is full");
+    }
+
     //check for the deleted pages first
     if(deleted_pages.empty() == false){
         size_t last_offset = deleted_pages.back();

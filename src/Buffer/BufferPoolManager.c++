@@ -66,7 +66,8 @@ char* BufferPoolManager::fetchPage(int page_id){
             this->disk_manager->write_page(old_page_id, old_page_data);
         }
         //remove it from the pages_table 
-        pages_table.erase(page_id);
+        // remove the evicted page from the lookup table
+        pages_table.erase(old_page_id);
 
     }
     //if we have empty frames, then just use one of them 
@@ -92,6 +93,10 @@ char* BufferPoolManager::fetchPage(int page_id){
 }
 
 int BufferPoolManager::newPage(){
+
+    // reserve the disk page before changing the buffer state
+    int new_page_offset = this->disk_manager->allocate_page();
+    int new_page_id = new_page_offset / PAGE_SIZE;
 
     int frame_id{-1};
 
@@ -120,9 +125,6 @@ int BufferPoolManager::newPage(){
 
     // now we have a free frame, ready to store a new page
     // ask the disk_manager to allocate us a new page 
-    int new_page_offset = this->disk_manager->allocate_page();
-    int new_page_id = new_page_offset / PAGE_SIZE;
-
     //read it into our free frame 
     this->disk_manager->read_page(new_page_id, frames[frame_id]);
 

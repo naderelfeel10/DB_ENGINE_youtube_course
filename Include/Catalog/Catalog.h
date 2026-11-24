@@ -5,6 +5,18 @@
 #include<string>
 using namespace std;
 
+// meta data about the index
+struct IndexInfo{
+    
+    string name;
+    string column_name;
+    int degree;
+    int root_page_id;
+
+    BPLusTree* tree;
+};
+
+
 class TableInfo{
 
 private : 
@@ -12,6 +24,14 @@ private :
     int table_id;
     vector<Column>schema;
     int first_page_id;
+
+    // let the catalog load and save this table's private metadata
+    friend class Catalog;
+    int metadata_page_id{-1};
+    TableHeap* heap{nullptr};
+
+    //keep track of indexes
+    vector<IndexInfo*> indexes;
 
 public: 
 
@@ -39,6 +59,9 @@ public:
         return this->schema;
     }
 
+    TableHeap* get_table_heap(){return heap;}
+    
+
 };
 
 
@@ -59,6 +82,13 @@ private:
     int lst_table_id{0};
     BufferPoolManager* catalog_BPM;
     BufferPoolManager* DB_BPM;
+
+    // remember which catalog pages contain table metadata
+    vector<int> table_pages;
+
+    // save a table's metadata in its catalog page
+    void save_table(TableInfo* table);
+    void attach_index(TableInfo* table, IndexInfo* index);
     
 public:
 
@@ -67,6 +97,10 @@ public:
     TableInfo* create_table(string table_name, vector<Column>schema);
     TableInfo* get_table(string table_name);
     TableInfo* get_table(int table_id);
+
+    // create an index for a table column or find one by name
+    IndexInfo* create_index(string index_name, string table_name, string column_name, int degree = 2);
+    IndexInfo* get_index(string index_name);
 
     void save_catalog();
     void load_catalog();

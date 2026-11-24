@@ -44,6 +44,7 @@ core.*
 
 # Test and coverage output
 Testing/
+/tests/
 coverage/
 *.gcda
 *.gcno

@@ -8,8 +8,7 @@
 #include"RID.h"
 
 #include"Buffer/BufferPoolManager.h"
-#include"Indexing/BPLusTreeIndex.h"
-#include"TableIterator.c++"
+#include"Storage/Indexing/BPLusTreeIndex.h"
 using namespace std;
 
 class TableHeap{
@@ -34,6 +33,8 @@ private:
 
 public:
     TableHeap(BufferPoolManager* BPM, vector<Column> schema, string table_name, int table_id);
+    // reopen a table using its existing first page
+    TableHeap(BufferPoolManager* BPM, vector<Column> schema, string table_name, int table_id, int first_page_id);
     BufferPoolManager* BPM;
 
     //crud 
@@ -43,6 +44,10 @@ public:
     bool delete_tuple(RID rid);
 
     void addIndex(BPLusTree* index, string col_name);
+
+    // attach an existing index without filling it again
+    void attachIndex(BPLusTree* index, string col_name);
+
     BPLusTree* getIndex(string col_name);
     void fill_index(string col_name);
 

@@ -34,7 +34,7 @@ int Page::insert_tuple(Tuple tuple){
         throw runtime_error("header is nullptr");
     }
 
-    int num_of_slots = header->num_of_tuples;
+    int num_of_slots = header->num_of_tuples + header->num_of_deleted_tuples;
     int slot_size = sizeof(Slot);
     int free_space = header->offset_pointer - (sizeof(PageHeader)  + slot_size*num_of_slots);
 
@@ -55,11 +55,14 @@ int Page::insert_tuple(Tuple tuple){
     slots[num_of_slots].offset = header->offset_pointer;
     slots[num_of_slots].size = tuple_size;
 
+    // this new slot contains a live row
+    slots[num_of_slots].is_deleted = false;
+
     header->num_of_tuples ++;
 
     //return the slot number 
 
-    return (header->num_of_tuples - 1);    
+    return num_of_slots;
 }
 
 bool Page::get_tuple(int slot_num, Tuple& tuple){
@@ -73,7 +76,14 @@ bool Page::get_tuple(int slot_num, Tuple& tuple){
         throw runtime_error("header is nullptr");
     }
 
+    // check the slot bounds and skip deleted rows before reading
+    if(slot_num < 0 || slot_num >= header->num_of_tuples + header->num_of_deleted_tuples){
+        return false;
+    }
     Slot* slots = reinterpret_cast<Slot*>(data + sizeof(PageHeader));
+    if(slots[slot_num].is_deleted){
+        return false;
+    }
     
     int offset = slots[slot_num].offset;
     int size = slots[slot_num].size;
@@ -105,7 +115,14 @@ bool Page::delete_tuple(int slot_num){
     }
 
     //get tuple offset
+
+    if(slot_num < 0 || slot_num >= header->num_of_tuples + header->num_of_deleted_tuples){
+        return false;
+    }
     Slot* slots = reinterpret_cast<Slot*>(data + sizeof(PageHeader));
+    if(slots[slot_num].is_deleted){
+        return false;
+    }
     
     int offset = slots[slot_num].offset;
     int size = slots[slot_num].size;
